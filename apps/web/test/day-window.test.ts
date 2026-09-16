@@ -38,11 +38,11 @@ test("bepaalt rond UTC-middernacht de kalenderdatum in Europe Brussels", () => {
   assert.equal(result.window?.start, "2026-08-27T22:00:00.000Z");
 });
 
-test("vandaag eindigt exact op de geïnjecteerde now", () => {
+test("vandaag houdt vijftien seconden marge voor klokverschil met de server", () => {
   const now = new Date("2026-08-28T13:47:12.345Z");
   const result = selectBrusselsDayWindow("today", now);
   assert.equal(result.label, "Vandaag");
-  assert.equal(result.window?.end, now.toISOString());
+  assert.equal(result.window?.end, "2026-08-28T13:46:57.345Z");
 });
 
 test("de grafiek voor vandaag houdt altijd het volledige Brusselse kalenderdagvenster", () => {
@@ -60,11 +60,15 @@ test("exact lokale middernacht is empty en maakt geen fetchvenster", () => {
   });
 });
 
+test("de eerste vijftien seconden na lokale middernacht blijven veilig empty", () => {
+  assert.equal(selectBrusselsDayWindow("today", new Date("2026-08-28T22:00:10.000Z")).state, "empty");
+});
+
 test("vandaag start correct op de zomertijd-overgangsdag", () => {
   const now = new Date("2026-03-29T10:00:00.000Z");
   assert.deepEqual(selectBrusselsDayWindow("today", now).window, {
     start: "2026-03-28T23:00:00.000Z",
-    end: now.toISOString(),
+    end: "2026-03-29T09:59:45.000Z",
   });
 });
 
@@ -72,7 +76,7 @@ test("vandaag start correct op de wintertijd-overgangsdag", () => {
   const now = new Date("2026-10-25T10:00:00.000Z");
   assert.deepEqual(selectBrusselsDayWindow("today", now).window, {
     start: "2026-10-24T22:00:00.000Z",
-    end: now.toISOString(),
+    end: "2026-10-25T09:59:45.000Z",
   });
 });
 

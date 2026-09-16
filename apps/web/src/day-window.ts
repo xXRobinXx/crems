@@ -19,6 +19,7 @@ export interface DayWindowSelection {
 }
 
 const TIME_ZONE = "Europe/Brussels";
+const LIVE_HISTORY_CLOCK_SKEW_MS = 15_000;
 const localDateFormatter = new Intl.DateTimeFormat("en-CA", {
   timeZone: TIME_ZONE,
   year: "numeric",
@@ -97,7 +98,8 @@ export const selectBrusselsDayWindow = (
   }
 
   const start = localMidnight(selectedDate);
-  const end = selection === "today" ? now : localMidnight(today);
+  const liveEnd = new Date(Math.max(start.getTime(), now.getTime() - LIVE_HISTORY_CLOCK_SKEW_MS));
+  const end = selection === "today" ? liveEnd : localMidnight(today);
   if (selection === "today" && start.getTime() === end.getTime()) {
     return { selection, label, dateLabel: dateLabel(selectedDate), state: "empty", window: null };
   }
