@@ -71,7 +71,7 @@ export function App() {
     const profile = profileFromPreview(csvPreview);
     const storage=browserStorage();
     if (!profile || !storage || !saveLocalEnergyProfile(storage, profile)) { setProfileMessage("Het lokale profiel kon niet veilig worden bewaard."); return; }
-    setEnergyProfile(profile); setProfileMessage("Energiepaspoort lokaal bewaard. Alleen veilige totalen en meetkwaliteit zijn opgeslagen.");
+    setEnergyProfile(profile); setProfileMessage("Energiepaspoort lokaal bewaard. Alleen veilige totalen en meetkwaliteit zijn opgeslagen."); setPage("report");
   };
   const forgetProfile = () => {
     const storage=browserStorage();if(!storage){setProfileMessage("Lokale opslag is niet beschikbaar.");return;}removeLocalEnergyProfile(storage);
