@@ -1,0 +1,2 @@
+import assert from "node:assert/strict";import test from "node:test";import { createFluviusRowScanner } from "../src/fluvius-stream-preview.ts";
+test("chunkscanner bewaart quotes escaped quotes UTF-8 en CRLF over grenzen",()=>{const rows:string[][]=[];const scanner=createFluviusRowScanner(row=>rows.push(row));for(const chunk of ["A;B;C\r","\néén;\"veld;met ","€ en \"","\"quote\"\"\";x\r","\n"])scanner.push(chunk);scanner.finish();assert.deepEqual(rows,[["A","B","C"],["één","veld;met € en \"quote\"","x"]]);});

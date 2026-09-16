@@ -1,0 +1,5 @@
+import { useEffect, useMemo, useState } from "react";
+import type { DaySelection } from "./day-window";
+import { createPriceHistoryController } from "./price-history-controller";
+import { loadPriceHistory, type PriceHistoryState } from "./price-history";
+export const usePriceHistory = (enabled: boolean, day: DaySelection) => { const [state,setState]=useState<PriceHistoryState>({status:"unavailable"}); const controller=useMemo(()=>createPriceHistoryController(setState,{request:fetch,load:loadPriceHistory,setInterval:(cb,ms)=>window.setInterval(cb,ms),clearInterval:timer=>window.clearInterval(timer)}),[]); useEffect(()=>{ const onVisibility=()=>controller.setVisibility(!document.hidden); controller.setVisibility(!document.hidden); document.addEventListener("visibilitychange",onVisibility); return()=>document.removeEventListener("visibilitychange",onVisibility); },[controller]); useEffect(()=>controller.update(enabled,day),[controller,enabled,day]); useEffect(()=>()=>controller.dispose(),[controller]); return state; };

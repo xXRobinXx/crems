@@ -1,0 +1,147 @@
+title: CREMS Energie
+views:
+  - title: Energie
+    path: overzicht
+    panel: true
+    cards:
+      - type: custom:apexcharts-card
+        graph_span: 48h
+        span:
+          start: day
+        update_interval: 30sec
+        header:
+          show: true
+          title: CREMS · live energie en prijzen voor vandaag en morgen
+          show_states: true
+          colorize_states: true
+        apex_config:
+          chart:
+            height: EVAL:Math.max(520, window.innerHeight - 105)
+            animations:
+              enabled: true
+              easing: easeinout
+              speed: 450
+            zoom:
+              enabled: false
+            selection:
+              enabled: false
+            toolbar:
+              show: true
+              tools:
+                download: false
+                selection: false
+                zoom: false
+                zoomin: false
+                zoomout: false
+                pan: false
+                reset: false
+                customIcons:
+                  - icon: >-
+                      <span style="font-size:20px;color:var(--primary-text-color)">⛶</span>
+                    index: 0
+                    title: Volledig scherm
+                    class: apexcharts-fullscreen-icon
+                    click: |
+                      EVAL:function(chartContext) {
+                        if (document.fullscreenElement) {
+                          document.exitFullscreen();
+                        } else {
+                          document.documentElement.requestFullscreen();
+                        }
+                      }
+          stroke:
+            lineCap: round
+          markers:
+            size: 0
+            hover:
+              size: 4
+          legend:
+            position: top
+          tooltip:
+            shared: true
+            intersect: false
+          grid:
+            borderColor: rgba(127, 127, 127, 0.16)
+          annotations:
+            yaxis:
+              - 'y': 0
+                borderColor: '#78909c'
+                borderWidth: 2
+                strokeDashArray: 0
+        yaxis:
+          - id: power
+            min: -3000
+            max: 5000
+            decimals: 0
+            apex_config:
+              tickAmount: 8
+              title:
+                text: Vermogen (W)
+          - id: price
+            opposite: true
+            min: 0
+            decimals: 1
+            apex_config:
+              title:
+                text: Prijs (ct/kWh)
+        series:
+          - entity: sensor.electricity_meter_energieverbruik
+            name: Verbruik
+            yaxis_id: power
+            type: area
+            color: '#2563eb'
+            opacity: 0.12
+            stroke_width: 1.6
+            curve: stepline
+            unit: W
+            extend_to: now
+            transform: return Number(x) * 1000;
+          - entity: sensor.electricity_meter_energieproductie
+            name: Injectie
+            yaxis_id: power
+            type: area
+            color: '#10b981'
+            opacity: 0.14
+            stroke_width: 1.6
+            curve: stepline
+            unit: W
+            extend_to: now
+            transform: return Number(x) * -1000;
+          - entity: sensor.energyzero_today_energy_current_hour_price
+            name: Prijs vandaag
+            yaxis_id: price
+            type: line
+            color: '#f59e0b'
+            stroke_width: 2.8
+            curve: stepline
+            unit: ct/kWh
+            extend_to: false
+            transform: return Number(x) * 100;
+            group_by:
+              duration: 1h
+              func: avg
+          - entity: sensor.nordpool
+            name: Prijs morgen
+            yaxis_id: price
+            type: line
+            color: '#fb7185'
+            stroke_width: 2.8
+            curve: stepline
+            unit: ct/kWh
+            show:
+              in_header: false
+            data_generator: |
+              const values = entity.attributes.raw_tomorrow || [];
+              return values.map(item => [
+                new Date(item.start).getTime(),
+                Number(item.value) * 100
+              ]);
+        card_mod:
+          style: |
+            ha-card {
+              height: 100vh;
+              border-radius: 0;
+              border: 0;
+              box-shadow: none;
+              background: linear-gradient(145deg, rgba(239,246,255,.96), rgba(248,250,252,.98));
+            }

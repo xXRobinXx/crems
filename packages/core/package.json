@@ -1,0 +1,18 @@
+{
+  "name": "@crems/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./csv": "./src/csv.ts",
+    "./fluvius-quarter-hour": "./src/fluvius-quarter-hour.ts",
+    "./fluvius-stream-preview": "./src/fluvius-stream-preview.ts"
+    ,"./battery-simulation": "./src/battery-simulation.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test test/*.test.ts"
+  }
+}

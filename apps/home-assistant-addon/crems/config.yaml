@@ -1,0 +1,36 @@
+name: CREMS Energie
+version: "0.1.0"
+slug: crems_energy
+description: Lokale energie-inzichten met een read-only Home Assistant-koppeling
+url: https://github.com/xXRobinXx/crems
+image: ghcr.io/xxrobinxx/crems-energy
+arch:
+  - aarch64
+startup: application
+boot: auto
+init: false
+homeassistant_api: true
+ports:
+  8099/tcp: 8099
+ports_description:
+  8099/tcp: CREMS webinterface
+webui: http://[HOST]:[PORT:8099]
+panel_icon: mdi:home-lightning-bolt
+options:
+  import_power_entity: ""
+  export_power_entity: ""
+  import_energy_entity: ""
+  export_energy_entity: ""
+  voltage_entity: ""
+  current_price_entity: ""
+  next_price_entity: ""
+  tomorrow_price_entity: ""
+schema:
+  import_power_entity: str?
+  export_power_entity: str?
+  import_energy_entity: str?
+  export_energy_entity: str?
+  voltage_entity: str?
+  current_price_entity: str?
+  next_price_entity: str?
+  tomorrow_price_entity: str?

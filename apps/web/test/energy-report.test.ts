@@ -1,0 +1,7 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { createEnergyReport } from "../src/energy-report.ts";
+
+const profile = { version: 2 as const, savedAt: "2026-01-03T00:00:00.000Z", period: { start: "2026-01-01T00:00:00.000Z", end: "2026-01-03T00:00:00.000Z" }, measuredImportKwh: 8, estimatedImportKwh: 2, measuredExportKwh: 3, estimatedExportKwh: 1, measuredCount: 8, estimatedCount: 1, noConsumptionCount: 1,integrityReliable:true,gapCount:2,duplicateCount:1,overlapCount:0 };
+test("maakt alleen herleidbare statistieken uit veilige profieltotalen", () => { assert.deepEqual(createEnergyReport(profile), { elapsedHours: 48, import: { measuredKwh: 8, estimatedKwh: 2, totalKwh: 10, estimatedPercent: 20 }, export: { measuredKwh: 3, estimatedKwh: 1, totalKwh: 4, estimatedPercent: 25 }, balance: { direction: "netImport", magnitudeKwh: 6 }, averagePer24Hours: { importKwh: 5, exportKwh: 2 }, gridFlowShares: { importPercent: 71.43, exportPercent: 28.57 }, intervalQuality: { totalCount: 10, measured: { count: 8, percent: 80 }, estimated: { count: 1, percent: 10 }, noConsumption: { count: 1, percent: 10 } },dataIntegrity:{reliable:true,gapCount:2,duplicateCount:1,overlapCount:0} }); });
+test("weigert een profiel met een ongeldige periode", () => { assert.equal(createEnergyReport({ ...profile, period: { start: profile.period.end, end: profile.period.start } }), undefined); });

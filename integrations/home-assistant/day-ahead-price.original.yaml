@@ -1,0 +1,40 @@
+# Backup van de bestaande Home Assistant-configuratie op 2026-08-25.
+# De volledige actieve configuratie blijft daarnaast in Home Assistant staan
+# totdat integrations/home-assistant/day-ahead-price.crems.yaml expliciet wordt opgeslagen.
+title: Day Ahead Price
+views:
+  - title: Vandaag
+    path: '0'
+    panel: true
+    cards:
+      - type: custom:apexcharts-card
+        graph_span: 24h
+        span:
+          start: day
+        update_interval: 30sec
+        header:
+          show: true
+          title: Vandaag · live verbruik, injectie & energieprijs
+          show_states: true
+          colorize_states: true
+        yaxis:
+          - id: power
+            min: -3000
+            max: 5000
+          - id: price
+            opposite: true
+        series:
+          - entity: sensor.electricity_meter_energieverbruik
+            name: Verbruik
+            transform: return Number(x) * 1000;
+          - entity: sensor.electricity_meter_energieproductie
+            name: Injectie
+            transform: return Number(x) * -1000;
+          - entity: sensor.energyzero_today_energy_current_hour_price
+            name: Energieprijs
+            transform: return Number(x) * 100;
+
+# De actieve configuratie bevatte daarnaast aparte, gelijkvormige views voor
+# Gisteren en Morgen. De volledige bron is tijdens de wijziging uit de ruwe
+# configuratie-editor gekopieerd; dit bestand documenteert de entiteiten en
+# hoofdinstellingen die nodig zijn om de oorspronkelijke kaart te herstellen.

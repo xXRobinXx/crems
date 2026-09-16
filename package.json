@@ -1,0 +1,19 @@
+{
+  "name": "crems",
+  "private": true,
+  "packageManager": "pnpm@11.19.0",
+  "scripts": {
+    "harness": "node tools/harness.mjs",
+    "test:harness": "node --test tools/harness.test.mjs",
+    "dev": "pnpm --parallel --filter @crems/bridge --filter @crems/web dev",
+    "dev:web": "pnpm --filter @crems/web dev",
+    "dev:bridge": "pnpm --filter @crems/bridge dev",
+    "start:bridge": "pnpm --filter @crems/bridge start",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  }
+}

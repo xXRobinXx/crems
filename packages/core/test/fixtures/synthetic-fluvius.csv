@@ -1,0 +1,3 @@
+Van (datum);Van (tijdstip);Tot (datum);Tot (tijdstip);EAN-code;Meter;Metertype;Register;Volume;Eenheid;Validatiestatus;Omschrijving
+25-10-2026;02:00:00;25-10-2026;02:15:00;;;synthetisch;Afname Dag;0,125;kWh;Uitgelezen;
+25-10-2026;02:00:00;25-10-2026;02:15:00;;;synthetisch;Injectie Nacht;0,000;kWh;Geen verbruik;

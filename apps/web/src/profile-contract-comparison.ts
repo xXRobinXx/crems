@@ -1,0 +1,5 @@
+import {compareProfileFlatContracts,type ProfileFlatContractComparison,type ProfileFlatContractInput} from "@crems/core";import type {LocalEnergyProfile} from "./local-energy-profile";
+export type FlatContractDraft=Readonly<{name:string;type:"fixed"|"variable"|"dynamic";validFrom:string;validUntil:string;importRateCtKwh:string;exportRateCtKwh:string}>;
+const number=(value:string)=>value.trim()===""?Number.NaN:Number(value.replace(",","."));
+const contract=(draft:FlatContractDraft):ProfileFlatContractInput|undefined=>{if(draft.type==="dynamic"||draft.name.trim()===""||draft.validFrom===""||draft.validUntil==="")return;return{name:draft.name.trim(),type:draft.type,validFrom:`${draft.validFrom}T00:00:00.000Z`,validUntil:`${draft.validUntil}T23:59:59.999Z`,importRateCtKwh:number(draft.importRateCtKwh),exportRateCtKwh:number(draft.exportRateCtKwh)};};
+export const compareLocalProfileContracts=(profile:LocalEnergyProfile|undefined,current:FlatContractDraft,candidate:FlatContractDraft):ProfileFlatContractComparison|undefined=>{if(!profile)return;const a=contract(current),b=contract(candidate);if(!a||!b)return;return compareProfileFlatContracts(profile,a,b);};

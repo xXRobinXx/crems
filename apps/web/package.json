@@ -1,0 +1,22 @@
+{
+  "name": "@crems/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "tsc -b && node scripts/build.mjs",
+    "typecheck": "tsc -b --pretty false",
+    "test": "node --test test/*.test.ts"
+  },
+  "dependencies": {
+    "@crems/core": "workspace:*",
+    "esbuild": "^0.28.2",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.10",
+    "@types/react-dom": "^19.1.7"
+  }
+}

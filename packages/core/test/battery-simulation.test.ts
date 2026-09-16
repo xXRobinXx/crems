@@ -1,0 +1,28 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { createBatterySimulator, simulateBatteryFromGridFlows } from "../src/battery-simulation.ts";
+
+const flow = (time: string, importKwh: number, exportKwh: number) => ({ start: `2026-08-01T${time}:00.000Z`, end: `2026-08-01T${String(Number(time.slice(0, 2)) + (time.slice(3) === "45" ? 1 : 0)).padStart(2, "0")}:${time.slice(3) === "45" ? "00" : String(Number(time.slice(3)) + 15).padStart(2, "0")}:00.000Z`, importKwh, exportKwh });
+test("simuleert laden uit injectie en ontladen naar later netverbruik met rendement en vermogenslimiet", () => { const result = simulateBatteryFromGridFlows([flow("10:00", 0, 2), flow("10:15", 2, 0)], { capacityKwh: 5, maxPowerKw: 8, roundTripEfficiency: 0.81, importRateEurKwh: 0.3, exportRateEurKwh: 0.05 }); assert.ok(result);assert.ok(Math.abs(result.lossesKwh-.38)<1e-12);assert.deepEqual({...result,lossesKwh:.38}, { shiftedKwh: 1.62, chargedFromExportKwh: 2, avoidedImportKwh: 1.62, remainingExportKwh: 0, equivalentCycles: 0.324, endingStoredKwh:0,lossesKwh:.38,estimatedEnergyComponentEur: 0.386 }); });
+test("weigert ongeldige capaciteit, niet-kwartierintervallen en een niet-chronologische tijdlijn", () => { assert.equal(simulateBatteryFromGridFlows([], { capacityKwh: 0, maxPowerKw: 2, roundTripEfficiency: .9 }), undefined); assert.equal(simulateBatteryFromGridFlows([{ ...flow("10:00", 0, 1), end: "2026-08-01T10:20:00.000Z" }], { capacityKwh: 2, maxPowerKw: 2, roundTripEfficiency: .9 }), undefined); assert.equal(simulateBatteryFromGridFlows([flow("10:15", 0, 1), flow("10:00", 1, 0)], { capacityKwh: 2, maxPowerKw: 2, roundTripEfficiency: .9 }), undefined); });
+test("weigert botsende intervallen met hetzelfde begin maar een ander einde", () => { assert.equal(simulateBatteryFromGridFlows([flow("10:00", 0, 1), { ...flow("10:00", 1, 0), end: "2026-08-01T10:20:00.000Z" }], { capacityKwh: 2, maxPowerKw: 2, roundTripEfficiency: .9 }), undefined); });
+test("finish is stabiel en push na finish verandert het resultaat niet", () => { const simulator=createBatterySimulator({ capacityKwh: 2, maxPowerKw: 2, roundTripEfficiency: .9 }); assert.ok(simulator); simulator.push(flow("10:00",0,1)); const first=simulator.finish(); simulator.push(flow("10:15",1,0)); assert.deepEqual(simulator.finish(),first); });
+test("waardeert laden en ontladen tegen de historische marktprijs van elk kwartier",()=>{const result=simulateBatteryFromGridFlows([{...flow("10:00",0,1),priceEurMwh:20},{...flow("10:15",1,0),priceEurMwh:120}],{capacityKwh:2,maxPowerKw:4,roundTripEfficiency:.81});assert.ok(Math.abs((result?.foregoneExportWholesaleValueEur??0)-.02)<1e-12);assert.ok(Math.abs((result?.avoidedImportWholesaleValueEur??0)-.0972)<1e-12);assert.ok(Math.abs((result?.wholesaleTimeShiftValueEur??0)-.0772)<1e-12);});
+test("weigert ook een lang gat tussen twee geldige kwartieren",()=>{assert.equal(simulateBatteryFromGridFlows([flow("10:00",0,1),flow("10:30",1,0)],{capacityKwh:2,maxPowerKw:4,roundTripEfficiency:.9}),undefined);});
+test("kan voor een technisch scenario conservatief resetten bij een gat",()=>{const result=simulateBatteryFromGridFlows([flow("10:00",0,1),flow("10:30",1,0)],{capacityKwh:2,maxPowerKw:4,roundTripEfficiency:1,gapPolicy:"reset"});assert.ok(result);assert.equal(result.shiftedKwh,0);assert.equal(result.endingStoredKwh,0);assert.equal(result.lossesKwh,1);});
+test("maakt terminale rest en verliezen zichtbaar zonder ze als shifted te tellen",()=>{const result=simulateBatteryFromGridFlows([flow("10:00",0,1)],{capacityKwh:2,maxPowerKw:4,roundTripEfficiency:.81});assert.ok(result);assert.ok(Math.abs(result.lossesKwh-.1)<1e-12);assert.deepEqual({...result,lossesKwh:.1},{shiftedKwh:0,chargedFromExportKwh:1,avoidedImportKwh:0,remainingExportKwh:0,equivalentCycles:0,endingStoredKwh:.9,lossesKwh:.1});});
+test("observaties combineren richtingen eenmaal en behouden lading over lokale middernacht",()=>{
+  const points:any[]=[];const simulator=createBatterySimulator({capacityKwh:3,maxPowerKw:1.5,roundTripEfficiency:.9,gapPolicy:"reset",onInterval:p=>points.push(p)})!;
+  simulator.push({start:"2025-01-01T22:45:00Z",end:"2025-01-01T23:00:00Z",importKwh:0,exportKwh:1});
+  simulator.push({start:"2025-01-01T23:00:00Z",end:"2025-01-01T23:15:00Z",importKwh:1,exportKwh:0});
+  simulator.push({start:"2025-01-01T23:00:00Z",end:"2025-01-01T23:15:00Z",importKwh:0,exportKwh:.1,estimated:true});
+  const result=simulator.finish()!;assert.equal(points.length,2);assert.equal(points[0].chargedKwh,.375);assert.ok(Math.abs(points[1].dischargedKwh-.3375)<1e-12);assert.equal(points[1].startStoredKwh,points[0].endStoredKwh);assert.equal(points[1].estimated,true);assert.equal(points[1].sourceImportKwh,1);assert.equal(points[1].sourceExportKwh,.1);assert.equal(points[1].gap,false);
+  assert.ok(Math.abs(points.reduce((sum,p)=>sum+p.conversionLossKwh+p.resetLossKwh,0)-result.lossesKwh)<1e-12);simulator.finish();assert.equal(points.length,2);
+});
+
+test("observaties onderscheiden conversieverlies van weggegooide lading bij gaten",()=>{
+  const points:any[]=[];const result=simulateBatteryFromGridFlows([flow("10:00",0,1),flow("10:30",1,0)],{capacityKwh:3,maxPowerKw:1.5,roundTripEfficiency:.9,gapPolicy:"reset",onInterval:p=>points.push(p)})!;
+  assert.equal(points[1].gap,true);assert.equal(points[1].resetLossKwh,points[0].endStoredKwh);assert.equal(points[1].dischargedKwh,0);
+  for(const p of points)assert.ok(Math.abs(p.startStoredKwh+p.chargedKwh-p.dischargedKwh-p.conversionLossKwh-p.resetLossKwh-p.endStoredKwh)<1e-12);
+  assert.ok(Math.abs(result.lossesKwh-.375)<1e-12);
+});

@@ -1,0 +1,15 @@
+.git
+.github
+.harness
+.pnpm-store
+.runtime-logs
+node_modules
+**/node_modules
+**/dist
+**/*.tsbuildinfo
+**/.env
+**/.env.*
+!**/.env.example
+archive
+research
+
