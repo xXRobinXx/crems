@@ -67,7 +67,7 @@ export function App() {
     setPage("battery");
   };
   const saveProfile = () => {
-    if (!csvPreview || typeof window === "undefined") return;
+    if (csvPreview?.status !== "success" || !selectedCsvFile || typeof window === "undefined") return;
     const profile = profileFromPreview(csvPreview);
     const storage=browserStorage();
     if (!profile || !storage || !saveLocalEnergyProfile(storage, profile)) { setProfileMessage("Het lokale profiel kon niet veilig worden bewaard."); return; }
