@@ -29,5 +29,5 @@ jobs:
           platforms: linux/arm64
           push: true
           tags: |
-            ghcr.io/xxrobinxx/crems-energy:0.1.4
+            ghcr.io/xxrobinxx/crems-energy:0.1.5
             ghcr.io/xxrobinxx/crems-energy:latest

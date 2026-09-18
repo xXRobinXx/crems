@@ -19,4 +19,5 @@ for (const [option, variable] of Object.entries(mapping)) {
   if (typeof value === "string" && value.trim()) process.env[variable] = value.trim();
 }
 process.env.HASS_TOKEN = process.env.SUPERVISOR_TOKEN ?? "";
+process.env.CREMS_DATA_DIR = "/data/crems";
 await import("./bridge/server.js");

@@ -18,6 +18,7 @@ import { BATTERY_CAPACITIES, compareBatteryCandidates, type BatteryCapacity, typ
 import {compareLocalProfileContracts,type FlatContractDraft} from "./profile-contract-comparison";
 import {BatteryDailyReport} from "./BatteryDailyReport";
 import {batteryLocalDay,expectedBatteryIntervals,type BatteryDay} from "./battery-daily-report";
+import {createCentralResultsClient} from "./central-results-client";
 
 type Page = "overview" | "import" | "report" | "battery" | "contract";
 type BatteryInput = { file: File; preview: Extract<CsvPreview, { status: "success" }> };
@@ -39,6 +40,16 @@ export function App() {
   const [csvProgress,setCsvProgress]=useState<{phase:"reading"|"finalizing"|"complete"|"cancelled";bytesRead:number;totalBytes:number}|null>(null);
   const [energyProfile, setEnergyProfile] = useState<LocalEnergyProfile | undefined>(() => {try{const storage=browserStorage();return storage?loadLocalEnergyProfile(storage):undefined;}catch{return undefined;}});
   const [profileMessage, setProfileMessage] = useState<string | undefined>();
+  const centralResults = useMemo(() => createCentralResultsClient(), []);
+  useEffect(() => {
+    let active = true;
+    void Promise.all([centralResults.getEnergyProfile(), centralResults.getBatteryReport()]).then(([profile, report]) => {
+      if (!active) return;
+      if (profile) setEnergyProfile(profile);
+      if (report) setBatteryStorage({ status: "current", report });
+    }).catch(() => { /* lokale resultaten blijven bruikbaar als de Pi tijdelijk niet bereikbaar is. */ });
+    return () => { active = false; };
+  }, [centralResults]);
   const csvSelection = useMemo(() => createCsvSelectionController((state) => {
     setCsvPreview(state.preview);
     setCsvProgress(state.progress);
@@ -71,14 +82,15 @@ export function App() {
     const profile = profileFromPreview(csvPreview);
     const storage=browserStorage();
     if (!profile || !storage || !saveLocalEnergyProfile(storage, profile)) { setProfileMessage("Het lokale profiel kon niet veilig worden bewaard."); return; }
-    setEnergyProfile(profile); setBatteryInput({file: selectedCsvFile!, preview: csvPreview}); setProfileMessage("Energiepaspoort lokaal bewaard. Alleen veilige totalen en meetkwaliteit zijn opgeslagen.");
+    setEnergyProfile(profile); setBatteryInput({file: selectedCsvFile!, preview: csvPreview}); setProfileMessage("Energiepaspoort bewaard. Alleen veilige totalen en meetkwaliteit zijn opgeslagen.");
+    void centralResults.saveEnergyProfile(profile).catch(() => setProfileMessage("Lokaal bewaard, maar synchroniseren met de Raspberry Pi lukte niet."));
   };
   const forgetProfile = () => {
     const storage=browserStorage();if(!storage){setProfileMessage("Lokale opslag is niet beschikbaar.");return;}removeLocalEnergyProfile(storage);
-    setEnergyProfile(undefined); setProfileMessage("Het lokale Energiepaspoort is verwijderd.");
+    setEnergyProfile(undefined); setProfileMessage("Het Energiepaspoort is verwijderd."); void centralResults.removeEnergyProfile().catch(() => setProfileMessage("Lokaal verwijderd, maar verwijderen op de Raspberry Pi lukte niet."));
   };
-  const reportSaved=(report:LocalBatteryReport)=>{if(batteryInput)setBatteryReplayInput(batteryInput);setBatteryStorage({status:"current",report});setBatteryInput(undefined);setSelectedCsvFile(undefined);setCsvPreview(null);setReplaceImport(false);setBatteryMessage("Batterijrapport lokaal bewaard.");};
-  const forgetBattery=(key?:string)=>{const storage=browserStorage();if(!removeBatteryStorage(storage,key)){setBatteryMessage("Verwijderen lukte niet; je rapport blijft bewaard en zichtbaar.");return;}setBatteryStorage(loadBatteryStorageState(storage));setBatteryInput(undefined);setBatteryReplayInput(undefined);setBatteryMessage("Lokaal rapport verwijderd.");};
+  const reportSaved=(report:LocalBatteryReport)=>{if(batteryInput)setBatteryReplayInput(batteryInput);setBatteryStorage({status:"current",report});setBatteryInput(undefined);setSelectedCsvFile(undefined);setCsvPreview(null);setReplaceImport(false);setBatteryMessage("Batterijrapport bewaard.");void centralResults.saveBatteryReport(report).catch(()=>setBatteryMessage("Lokaal bewaard, maar synchroniseren met de Raspberry Pi lukte niet."));};
+  const forgetBattery=(key?:string)=>{const storage=browserStorage();if(!removeBatteryStorage(storage,key)){setBatteryMessage("Verwijderen lukte niet; je rapport blijft bewaard en zichtbaar.");return;}setBatteryStorage(loadBatteryStorageState(storage));setBatteryInput(undefined);setBatteryReplayInput(undefined);setBatteryMessage("Batterijrapport verwijderd.");void centralResults.removeBatteryReport().catch(()=>setBatteryMessage("Lokaal verwijderd, maar verwijderen op de Raspberry Pi lukte niet."));};
 
   return <main className="shell">
     <header>

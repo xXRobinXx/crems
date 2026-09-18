@@ -12,6 +12,8 @@ import { createMeterSource } from "./source-factory.js";
 import { handlePriceHistoryRequest } from "./price-history-route.js";
 import { loadBelpexArchive } from "./belpex-history.js";
 import { handleBelpexHistoryRequest } from "./belpex-history-route.js";
+import { CentralStorage } from "./central-storage.js";
+import { handleCentralStorageRequest } from "./central-storage-route.js";
 
 const envPath = fileURLToPath(new URL("../.env", import.meta.url));
 const localEnv: Record<string, string> = {};
@@ -23,6 +25,7 @@ try {
   }
 } catch { /* Lokale configuratie blijft optioneel. */ }
 const setting = (name: string) => process.env[name]?.trim() || localEnv[name]?.trim();
+const centralStorage = new CentralStorage(setting("CREMS_DATA_DIR") || fileURLToPath(new URL("../data/runtime", import.meta.url)));
 
 const listenConfig = parseBridgeListenConfig(setting("CREMS_BRIDGE_PORT"), setting("CREMS_BRIDGE_HOST"));
 const webRoot = setting("CREMS_WEB_ROOT");
@@ -71,6 +74,7 @@ const server = createServer((request, response) => {
   })) return;
   if (handlePriceHistoryRequest(request, response, source)) return;
   if (handleBelpexHistoryRequest(request,response,belpexArchive)) return;
+  if (handleCentralStorageRequest(request, response, centralStorage)) return;
   if (url.pathname === "/api/current") return json(response, 200, latest);
   if (url.pathname === "/api/stream") {
     response.writeHead(200, {
