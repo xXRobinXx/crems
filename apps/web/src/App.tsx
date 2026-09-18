@@ -19,6 +19,7 @@ import {compareLocalProfileContracts,type FlatContractDraft} from "./profile-con
 import {BatteryDailyReport} from "./BatteryDailyReport";
 import {batteryLocalDay,expectedBatteryIntervals,type BatteryDay} from "./battery-daily-report";
 import {createCentralResultsClient} from "./central-results-client";
+import {belgian2026FinancialValues} from "./belgian-financial-defaults";
 
 type Page = "overview" | "import" | "report" | "battery" | "contract";
 type BatteryInput = { file: File; preview: Extract<CsvPreview, { status: "success" }> };
@@ -165,7 +166,8 @@ function BatteryPlanner({input,replayInput,saved,onSaved,onForget,onOpenImport}:
 
 function ReleaseBatteryResult({comparisons,daily,onChooseSource,priceSource,quality,savedFinancial,isSaved,onSave}:{comparisons:BatteryComparison[];daily?:BatteryDay[];onChooseSource?:()=>void;priceSource?:string;quality:{period:{start:string;end:string};integrityReliable:boolean;estimatedCount:number;gapCount:number;duplicateCount:number;overlapCount:number};savedFinancial?:BatteryFinancialSnapshot;isSaved:boolean;onSave:(financial?:BatteryFinancialSnapshot)=>boolean}){
   const stored=savedFinancial?.assumptions;
-  const blank={contractName:"",contractType:"fixed" as "fixed"|"variable"|"dynamic",effectiveStart:"",effectiveEnd:"",quoteSource:"",quoteDate:"",warranty:"",importRate:"",exportRate:"",life:"",degradation:"",discount:"",p3:"",p5:"",p7:"",p10:"",p13:"",pricesIncludeVat:false};
+  const market=belgian2026FinancialValues();
+  const blank={contractName:"Gemiddelde Belgische richtwaarde 2026",contractType:"fixed" as "fixed"|"variable"|"dynamic",effectiveStart:"",effectiveEnd:"",quoteSource:"Marktrichtwaarde België 2026",quoteDate:"2026-01-01",warranty:"10",importRate:String(market.importRateCtKwh),exportRate:String(market.exportRateCtKwh),life:String(market.lifeYears),degradation:String(market.annualDegradationPercent),discount:String(market.discountRatePercent),p3:String(market.investmentsEur[3]),p5:String(market.investmentsEur[5]),p7:String(market.investmentsEur[7]),p10:String(market.investmentsEur[10]),p13:String(market.investmentsEur[13]),pricesIncludeVat:true};
   const [draft,setDraft]=useState(()=>stored?{contractName:stored.contractName,contractType:stored.contractType,effectiveStart:stored.effectiveStart,effectiveEnd:stored.effectiveEnd,quoteSource:stored.quoteSource,quoteDate:stored.quoteDate,warranty:String(stored.warrantyYears),importRate:String(stored.importRateCtKwh),exportRate:String(stored.exportRateCtKwh),life:String(stored.lifeYears),degradation:String(stored.annualDegradationPercent),discount:String(stored.discountRatePercent),p3:String(stored.investmentsEur[3]),p5:String(stored.investmentsEur[5]),p7:String(stored.investmentsEur[7]),p10:String(stored.investmentsEur[10]),p13:String(stored.investmentsEur[13]),pricesIncludeVat:true}:blank);
   const [confirmed,setConfirmed]=useState(Boolean(stored));const [saveMessage,setSaveMessage]=useState<string>();
   const change=<K extends keyof typeof draft>(key:K,value:(typeof draft)[K])=>{setDraft(current=>({...current,[key]:value}));setConfirmed(false);setSaveMessage(undefined);};

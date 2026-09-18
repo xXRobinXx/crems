@@ -8,3 +8,25 @@ test("blijft technisch totdat alle financiële aannames expliciet bevestigd zijn
 test("blokkeert scalarberekening voor dynamische contracten en tarieven buiten de meetperiode",()=>{assert.equal(compareBatteryCandidates(quality,candidates,{...assumptions,contractType:"dynamic"}).status,"technical");assert.equal(compareBatteryCandidates(quality,candidates,{...assumptions,effectiveStart:"2025-01-02"}).status,"technical");assert.equal(compareBatteryCandidates(quality,candidates,{...assumptions,effectiveEnd:"2026-01-01"}).status,"technical");assert.equal(compareBatteryCandidates(quality,candidates,assumptions).status,"financial");});
 test("berekent transparante low base high cashflows, NPV en payback",()=>{const result=compareBatteryCandidates(quality,candidates,assumptions);assert.equal(result.status,"financial");if(result.status!=="financial")return;assert.equal(result.candidates.length,5);assert.equal(result.candidates[0]!.low.cashflowsEur.length,15);assert.ok(result.candidates[0]!.low.npvEur<result.candidates[0]!.base.npvEur);assert.ok(result.candidates[0]!.base.npvEur<result.candidates[0]!.high.npvEur);assert.equal(result.recommendedCapacityKwh,null);});
 test("controller publiceert exact het pure resultaat",()=>{const values:unknown[]=[];const controller=createBatteryComparisonController(value=>values.push(value));const result=controller.evaluate(quality,candidates);assert.deepEqual(values,[result]);});
+
+// Exact financial regression checks: preserve the energy-component formula, discounting and fractional payback.
+test("rekent jaarlijkse energiewaarde, discounted NPV en fractionele terugverdientijd reproduceerbaar uit",()=>{
+  const profitable=BATTERY_CAPACITIES.map((capacityKwh,index)=>({capacityKwh,powerKw:capacityKwh/2,shiftedKwh:index===0?10000:0,chargedFromExportKwh:0}));
+  const result=compareBatteryCandidates(quality,profitable,assumptions);
+  assert.equal(result.status,"financial");
+  if(result.status!=="financial")return;
+  const first=result.candidates[0]!;
+  assert.equal(first.annualEnergySavingEur,2993.79);
+  assert.equal(first.base.cashflowsEur[0],2993.79);
+  assert.equal(first.base.cashflowsEur[1],2933.92);
+  assert.equal(first.base.paybackYears,1.34);
+  assert.equal(first.base.npvEur,27491.15);
+  assert.equal(result.recommendedCapacityKwh,3);
+});
+
+test("blokkeert ROI voor ontbrekende, ongeldige of niet volledig gedekte financiële context",()=>{
+  assert.equal(compareBatteryCandidates(quality,candidates,{...assumptions,importRateCtKwh:-1}).status,"technical");
+  assert.equal(compareBatteryCandidates(quality,candidates,{...assumptions,investmentsEur:{...assumptions.investmentsEur,10:0}}).status,"technical");
+  assert.equal(compareBatteryCandidates(quality,candidates,{...assumptions,effectiveStart:"2025-01-02"}).status,"technical");
+  assert.equal(compareBatteryCandidates({...quality,gapCount:1},candidates,assumptions).status,"ineligible");
+});
