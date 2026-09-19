@@ -70,6 +70,14 @@ test("404 betekent leeg resultaat; DELETE op een lege installatie is veilig", as
 test("een 200-resultaat met null wordt als lege centrale opslag behandeld", async () => {
   const client = createCentralResultsClient({ fetchImpl: (async () => json({ result: null })) as typeof fetch });
   assert.equal(await client.getEnergyProfile(), undefined);
+  assert.deepEqual(await client.getEnergyProfileState(), { status: "empty" });
+});
+
+test("centrale 404 en null zijn expliciet leeg, netwerkfouten blijven fouten", async () => {
+  const empty = createCentralResultsClient({ fetchImpl: (async () => new Response(null, { status: 404 })) as typeof fetch });
+  assert.deepEqual(await empty.getBatteryReportState(), { status: "empty" });
+  const failing = createCentralResultsClient({ fetchImpl: (async () => { throw new Error("offline"); }) as typeof fetch });
+  await assert.rejects(() => failing.getBatteryReportState(), (error: unknown) => error instanceof CentralResultsError && error.code === "network");
 });
 
 test("ongeldige antwoorden en netwerkfouten geven veilige domeinfouten", async () => {

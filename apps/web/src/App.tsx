@@ -44,11 +44,17 @@ export function App() {
   const centralResults = useMemo(() => createCentralResultsClient(), []);
   useEffect(() => {
     let active = true;
-    void Promise.all([centralResults.getEnergyProfile(), centralResults.getBatteryReport()]).then(([profile, report]) => {
+    void Promise.allSettled([centralResults.getEnergyProfileState(), centralResults.getBatteryReportState()]).then(([profileResult, reportResult]) => {
       if (!active) return;
-      if (profile) setEnergyProfile(profile);
-      if (report) setBatteryStorage({ status: "current", report });
-    }).catch(() => { /* lokale resultaten blijven bruikbaar als de Pi tijdelijk niet bereikbaar is. */ });
+      if (profileResult.status === "fulfilled") {
+        if (profileResult.value.status === "present") setEnergyProfile(profileResult.value.value);
+        else { const storage = browserStorage(); if (storage) removeLocalEnergyProfile(storage); setEnergyProfile(undefined); }
+      }
+      if (reportResult.status === "fulfilled") {
+        if (reportResult.value.status === "present") setBatteryStorage({ status: "current", report: reportResult.value.value });
+        else { removeBatteryStorage(browserStorage()); setBatteryStorage({ status: "empty" }); setBatteryReplayInput(undefined); }
+      }
+    });
     return () => { active = false; };
   }, [centralResults]);
   const csvSelection = useMemo(() => createCsvSelectionController((state) => {
@@ -68,6 +74,8 @@ export function App() {
   const handleFileSelection = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     setSelectedCsvFile(file);
+    setProfileMessage(undefined);
+    setBatteryMessage(undefined);
     setBatteryInput(undefined);
     setBatteryReplayInput(undefined);
     void csvSelection.select(file);
@@ -88,7 +96,7 @@ export function App() {
   };
   const forgetProfile = () => {
     const storage=browserStorage();if(!storage){setProfileMessage("Lokale opslag is niet beschikbaar.");return;}removeLocalEnergyProfile(storage);
-    setEnergyProfile(undefined); setProfileMessage("Het Energiepaspoort is verwijderd."); void centralResults.removeEnergyProfile().catch(() => setProfileMessage("Lokaal verwijderd, maar verwijderen op de Raspberry Pi lukte niet."));
+    setEnergyProfile(undefined); setProfileMessage(undefined); void centralResults.removeEnergyProfile().catch(() => setProfileMessage("Lokaal verwijderd, maar verwijderen op de Raspberry Pi lukte niet."));
   };
   const reportSaved=(report:LocalBatteryReport)=>{if(batteryInput)setBatteryReplayInput(batteryInput);setBatteryStorage({status:"current",report});setBatteryInput(undefined);setSelectedCsvFile(undefined);setCsvPreview(null);setReplaceImport(false);setBatteryMessage("Batterijrapport bewaard.");void centralResults.saveBatteryReport(report).catch(()=>setBatteryMessage("Lokaal bewaard, maar synchroniseren met de Raspberry Pi lukte niet."));};
   const forgetBattery=(key?:string)=>{const storage=browserStorage();if(!removeBatteryStorage(storage,key)){setBatteryMessage("Verwijderen lukte niet; je rapport blijft bewaard en zichtbaar.");return;}setBatteryStorage(loadBatteryStorageState(storage));setBatteryInput(undefined);setBatteryReplayInput(undefined);setBatteryMessage("Batterijrapport verwijderd.");void centralResults.removeBatteryReport().catch(()=>setBatteryMessage("Lokaal verwijderd, maar verwijderen op de Raspberry Pi lukte niet."));};
@@ -167,7 +175,7 @@ function BatteryPlanner({input,replayInput,saved,onSaved,onForget,onOpenImport}:
 function ReleaseBatteryResult({comparisons,daily,onChooseSource,priceSource,quality,savedFinancial,isSaved,onSave}:{comparisons:BatteryComparison[];daily?:BatteryDay[];onChooseSource?:()=>void;priceSource?:string;quality:{period:{start:string;end:string};integrityReliable:boolean;estimatedCount:number;gapCount:number;duplicateCount:number;overlapCount:number};savedFinancial?:BatteryFinancialSnapshot;isSaved:boolean;onSave:(financial?:BatteryFinancialSnapshot)=>boolean}){
   const stored=savedFinancial?.assumptions;
   const market=belgian2026FinancialValues();
-  const blank={contractName:"Gemiddelde Belgische richtwaarde 2026",contractType:"fixed" as "fixed"|"variable"|"dynamic",effectiveStart:"",effectiveEnd:"",quoteSource:"Marktrichtwaarde België 2026",quoteDate:"2026-01-01",warranty:"10",importRate:String(market.importRateCtKwh),exportRate:String(market.exportRateCtKwh),life:String(market.lifeYears),degradation:String(market.annualDegradationPercent),discount:String(market.discountRatePercent),p3:String(market.investmentsEur[3]),p5:String(market.investmentsEur[5]),p7:String(market.investmentsEur[7]),p10:String(market.investmentsEur[10]),p13:String(market.investmentsEur[13]),pricesIncludeVat:true};
+  const blank={contractName:"Gemiddelde Belgische richtwaarde 2026",contractType:"fixed" as "fixed"|"variable"|"dynamic",effectiveStart:batteryLocalDay(quality.period.start),effectiveEnd:batteryLocalDay(new Date(Date.parse(quality.period.end)+86_400_000).toISOString()),quoteSource:"Marktrichtwaarde België 2026",quoteDate:"2026-01-01",warranty:"10",importRate:String(market.importRateCtKwh),exportRate:String(market.exportRateCtKwh),life:String(market.lifeYears),degradation:String(market.annualDegradationPercent),discount:String(market.discountRatePercent),p3:String(market.investmentsEur[3]),p5:String(market.investmentsEur[5]),p7:String(market.investmentsEur[7]),p10:String(market.investmentsEur[10]),p13:String(market.investmentsEur[13]),pricesIncludeVat:true};
   const [draft,setDraft]=useState(()=>stored?{contractName:stored.contractName,contractType:stored.contractType,effectiveStart:stored.effectiveStart,effectiveEnd:stored.effectiveEnd,quoteSource:stored.quoteSource,quoteDate:stored.quoteDate,warranty:String(stored.warrantyYears),importRate:String(stored.importRateCtKwh),exportRate:String(stored.exportRateCtKwh),life:String(stored.lifeYears),degradation:String(stored.annualDegradationPercent),discount:String(stored.discountRatePercent),p3:String(stored.investmentsEur[3]),p5:String(stored.investmentsEur[5]),p7:String(stored.investmentsEur[7]),p10:String(stored.investmentsEur[10]),p13:String(stored.investmentsEur[13]),pricesIncludeVat:true}:blank);
   const [confirmed,setConfirmed]=useState(Boolean(stored));const [saveMessage,setSaveMessage]=useState<string>();
   const change=<K extends keyof typeof draft>(key:K,value:(typeof draft)[K])=>{setDraft(current=>({...current,[key]:value}));setConfirmed(false);setSaveMessage(undefined);};

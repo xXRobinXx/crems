@@ -17,6 +17,37 @@ const battery = {
   technical: [3, 5, 7, 10, 13].map((capacityKwh) => ({ capacityKwh, powerKw: capacityKwh / 2, shiftedKwh: 1, chargedFromExportKwh: 1, endingStoredKwh: 0, lossesKwh: 0, equivalentCycles: 1 })),
 };
 
+const financialBattery = () => {
+  const assumptions = {
+    confirmed: true as const, importRateCtKwh: 30, exportRateCtKwh: 4, lifeYears: 15,
+    annualDegradationPercent: 2, discountRatePercent: 3,
+    investmentsEur: { 3: 1_000, 5: 2_000, 7: 3_000, 10: 4_000, 13: 5_000 },
+    contractName: "Testcontract", contractType: "fixed" as const,
+    effectiveStart: profile.period.start, effectiveEnd: profile.period.end,
+    quoteSource: "Testofferte", quoteDate: "2026-01-02", warrantyYears: 10, pricesIncludeVat: true as const,
+  };
+  const years = (Date.parse(profile.period.end) - Date.parse(profile.period.start)) / (365.2425 * 86_400_000);
+  const rounded = (value: number) => Math.round(value * 100) / 100;
+  const scenario = (annualSaving: number, investment: number, annualFactor: 0.8 | 1 | 1.2) => {
+    const degradation = 1 - assumptions.annualDegradationPercent / 100;
+    const discount = 1 + assumptions.discountRatePercent / 100;
+    const cashflows = Array.from({ length: assumptions.lifeYears }, (_, index) => rounded(annualSaving * annualFactor * degradation ** index));
+    let cumulative = -investment, npv = -investment, paybackYears: number | null = null;
+    cashflows.forEach((cashflow, index) => {
+      const before = cumulative; cumulative += cashflow; npv += cashflow / discount ** (index + 1);
+      if (paybackYears === null && before < 0 && cumulative >= 0 && cashflow > 0) paybackYears = rounded(index + (-before / cashflow));
+    });
+    return { annualFactor, cashflowsEur: cashflows, npvEur: rounded(npv), paybackYears };
+  };
+  const results = battery.technical.map((technicalItem) => {
+    const annualEnergySavingEur = rounded((technicalItem.shiftedKwh * assumptions.importRateCtKwh / 100 - technicalItem.chargedFromExportKwh * assumptions.exportRateCtKwh / 100) / years);
+    const investmentEur = assumptions.investmentsEur[technicalItem.capacityKwh as keyof typeof assumptions.investmentsEur];
+    const unrounded = (technicalItem.shiftedKwh * assumptions.importRateCtKwh / 100 - technicalItem.chargedFromExportKwh * assumptions.exportRateCtKwh / 100) / years;
+    return { capacityKwh: technicalItem.capacityKwh, investmentEur, annualEnergySavingEur, low: scenario(unrounded, investmentEur, .8), base: scenario(unrounded, investmentEur, 1), high: scenario(unrounded, investmentEur, 1.2) };
+  });
+  return { ...battery, financial: { assumptions, results, recommendedCapacityKwh: null } };
+};
+
 const temporaryDirectory = async () => mkdtemp(join(tmpdir(), "crems-central-storage-"));
 
 test("central storage validates allowlists and rejects raw fields", async () => {
@@ -30,6 +61,15 @@ test("central storage validates allowlists and rejects raw fields", async () => 
     await assert.rejects(storage.put("energy-profile", { ...profile, token: "secret" }), /invalid_result/);
     assert.equal(await storage.get("energy-profile"), undefined);
   } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test("central storage recomputes financial snapshots and requires eligible quality", () => {
+  const valid = financialBattery();
+  assert.equal(validateCentralResult("battery-report", valid), true);
+  assert.equal(validateCentralResult("battery-report", { ...valid, financial: { ...valid.financial, results: valid.financial.results.map((item, index) => index === 0 ? { ...item, annualEnergySavingEur: item.annualEnergySavingEur + 1 } : item) } }), false);
+  assert.equal(validateCentralResult("battery-report", { ...valid, financial: { ...valid.financial, results: valid.financial.results.map((item, index) => index === 0 ? { ...item, base: { ...item.base, npvEur: item.base.npvEur + 1 } } : item) } }), false);
+  assert.equal(validateCentralResult("battery-report", { ...valid, financial: { ...valid.financial, recommendedCapacityKwh: 3 } }), false);
+  assert.equal(validateCentralResult("battery-report", { ...valid, quality: { ...valid.quality, gapCount: 1 } }), false);
 });
 
 test("central storage writes atomically and preserves concurrent result types", async () => {

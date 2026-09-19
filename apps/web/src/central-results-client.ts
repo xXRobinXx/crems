@@ -2,6 +2,10 @@ import { saveBatteryReport, validateBatteryReport, type LocalBatteryReport } fro
 import { saveLocalEnergyProfile, type LocalEnergyProfile } from "./local-energy-profile.ts";
 
 export type CentralResultKind = "energy-profile" | "battery-report";
+export type CentralResultState<T> = Readonly<
+  | { status: "present"; value: T }
+  | { status: "empty" }
+>;
 
 export type CentralResultsClientOptions = Readonly<{
   /** Base URL of the bridge. Keep empty when the webapp is served by the bridge itself. */
@@ -90,15 +94,20 @@ export const createCentralResultsClient = (options: CentralResultsClientOptions 
   const baseUrl = options.baseUrl ?? "";
   const fetchImpl = options.fetchImpl ?? defaultFetch();
 
-  const get = async <T extends StoredResult>(kind: CentralResultKind): Promise<T | undefined> => {
+  const getState = async <T extends StoredResult>(kind: CentralResultKind): Promise<CentralResultState<T>> => {
     let response: Response;
     try { response = await fetchImpl(endpoint(baseUrl, kind), { method: "GET", headers: { Accept: "application/json" } }); }
     catch (error) { return network(error); }
-    if (response.status === 404) return undefined;
+    if (response.status === 404) return { status: "empty" };
     ensureResponse(response);
     const value = unwrapResult(await responseBody(response));
-    if (value === undefined || value === null) return undefined;
-    return parse(kind, value) as T;
+    if (value === undefined || value === null) return { status: "empty" };
+    return { status: "present", value: parse(kind, value) as T };
+  };
+
+  const get = async <T extends StoredResult>(kind: CentralResultKind): Promise<T | undefined> => {
+    const state = await getState<T>(kind);
+    return state.status === "present" ? state.value : undefined;
   };
 
   const put = async <T extends StoredResult>(kind: CentralResultKind, value: T): Promise<T> => {
@@ -127,9 +136,11 @@ export const createCentralResultsClient = (options: CentralResultsClientOptions 
 
   return {
     getEnergyProfile: () => get<LocalEnergyProfile>("energy-profile"),
+    getEnergyProfileState: () => getState<LocalEnergyProfile>("energy-profile"),
     saveEnergyProfile: (profile: LocalEnergyProfile) => put("energy-profile", profile),
     removeEnergyProfile: () => remove("energy-profile"),
     getBatteryReport: () => get<LocalBatteryReport>("battery-report"),
+    getBatteryReportState: () => getState<LocalBatteryReport>("battery-report"),
     saveBatteryReport: (report: LocalBatteryReport) => put("battery-report", report),
     removeBatteryReport: () => remove("battery-report"),
   };

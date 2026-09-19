@@ -13,6 +13,8 @@ const object = (value: unknown): value is AnyObject => !!value && typeof value =
 const exact = (value: AnyObject, keys: readonly string[]) => Object.keys(value).length === keys.length && Object.keys(value).every((key) => keys.includes(key));
 const finite = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
 const nonNegative = (value: unknown): value is number => finite(value) && value >= 0;
+const rounded = (value: number) => Math.round(value * 100) / 100;
+const close = (a: number, b: unknown) => typeof b === "number" && Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b));
 const date = (value: unknown) => typeof value === "string" && Number.isFinite(Date.parse(value));
 const validPeriod = (value: unknown) => object(value) && exact(value, ["start", "end"]) && date(value.start) && date(value.end) && Date.parse(value.end) > Date.parse(value.start);
 
@@ -63,14 +65,44 @@ const validFinancial = (value: unknown, quality: AnyObject, technical: any[]) =>
   if (!object(value) || !exact(v, ["assumptions", "results", "recommendedCapacityKwh"]) || !object(v.assumptions) || !Array.isArray(v.results) || v.results.length !== 5) return false;
   const a = v.assumptions as AnyObject;
   if (!exact(a, ["confirmed", "importRateCtKwh", "exportRateCtKwh", "lifeYears", "annualDegradationPercent", "discountRatePercent", "investmentsEur", "contractName", "contractType", "effectiveStart", "effectiveEnd", "quoteSource", "quoteDate", "warrantyYears", "pricesIncludeVat"]) || a.confirmed !== true || a.pricesIncludeVat !== true || typeof a.contractName !== "string" || a.contractName.trim() === "" || typeof a.quoteSource !== "string" || a.quoteSource.trim() === "" || (a.contractType !== "fixed" && a.contractType !== "variable") || !date(a.effectiveStart) || !date(a.effectiveEnd) || Date.parse(a.effectiveEnd) <= Date.parse(a.effectiveStart) || !date(a.quoteDate) || !Number.isInteger(a.lifeYears) || a.lifeYears < 1 || a.lifeYears > 30 || !Number.isInteger(a.warrantyYears) || a.warrantyYears < 1 || a.warrantyYears > 30 || ![a.importRateCtKwh, a.exportRateCtKwh, a.annualDegradationPercent, a.discountRatePercent].every(nonNegative) || a.annualDegradationPercent >= 100 || a.discountRatePercent >= 100 || !object(a.investmentsEur) || !CAPACITIES.every((capacity) => nonNegative(a.investmentsEur[String(capacity)]) && a.investmentsEur[String(capacity)] > 0)) return false;
-  return validQuality(quality) && Array.isArray(technical) && v.results.every((item: unknown, index: number) => {
-    const result = item as AnyObject;
-    if (!object(item) || !exact(result, ["capacityKwh", "investmentEur", "annualEnergySavingEur", "low", "base", "high"]) || result.capacityKwh !== CAPACITIES[index] || result.investmentEur !== a.investmentsEur[String(result.capacityKwh)] || !finite(result.annualEnergySavingEur)) return false;
-    return [result.low, result.base, result.high].every((scenario: unknown) => {
-      const s = scenario as AnyObject;
-      return object(scenario) && exact(s, ["annualFactor", "cashflowsEur", "npvEur", "paybackYears"]) && [0.8, 1, 1.2].includes(s.annualFactor) && Array.isArray(s.cashflowsEur) && s.cashflowsEur.length === a.lifeYears && s.cashflowsEur.every(finite) && finite(s.npvEur) && (s.paybackYears === null || nonNegative(s.paybackYears));
+  if (!validQuality(quality) || !Array.isArray(technical) || !quality.integrityReliable || quality.estimatedCount !== 0 || quality.gapCount !== 0 || quality.duplicateCount !== 0 || quality.overlapCount !== 0 || Date.parse(quality.period.end) - Date.parse(quality.period.start) < 365 * 86_400_000) return false;
+  const years = (Date.parse(quality.period.end) - Date.parse(quality.period.start)) / (365.2425 * 86_400_000);
+  const expectedScenario = (annualSaving: number, investment: number, annualFactor: 0.8 | 1 | 1.2): AnyObject => {
+    const degradation = 1 - a.annualDegradationPercent / 100;
+    const discount = 1 + a.discountRatePercent / 100;
+    const cashflows = Array.from({ length: a.lifeYears }, (_, index) => rounded(annualSaving * annualFactor * degradation ** index));
+    let cumulative = -investment;
+    let npv = -investment;
+    let paybackYears: number | null = null;
+    cashflows.forEach((cashflow, index) => {
+      const before = cumulative;
+      cumulative += cashflow;
+      npv += cashflow / discount ** (index + 1);
+      if (paybackYears === null && before < 0 && cumulative >= 0 && cashflow > 0) paybackYears = rounded(index + (-before / cashflow));
     });
-  }) && (v.recommendedCapacityKwh === null || CAPACITIES.includes(v.recommendedCapacityKwh));
+    return { annualFactor, cashflowsEur: cashflows, npvEur: rounded(npv), paybackYears };
+  };
+  const expected = v.results.map((item: unknown) => {
+    if (!object(item)) return undefined;
+    const source = technical.find((candidate: AnyObject) => candidate.capacityKwh === item.capacityKwh);
+    if (!source) return undefined;
+    const annualSaving = (source.shiftedKwh * a.importRateCtKwh / 100 - source.chargedFromExportKwh * a.exportRateCtKwh / 100) / years;
+    const investment = a.investmentsEur[String(item.capacityKwh)];
+    return { annualEnergySavingEur: rounded(annualSaving), low: expectedScenario(annualSaving, investment, .8), base: expectedScenario(annualSaving, investment, 1), high: expectedScenario(annualSaving, investment, 1.2) };
+  });
+  if (expected.some((item) => item === undefined)) return false;
+  const ranked = [...v.results].sort((left: AnyObject, right: AnyObject) => Number(right.base.npvEur) - Number(left.base.npvEur) || Number(left.capacityKwh) - Number(right.capacityKwh));
+  const expectedRecommendation = ranked[0]!.base.npvEur > 0 ? ranked[0]!.capacityKwh : null;
+  return v.results.every((item: unknown, index: number) => {
+    const result = item as AnyObject;
+    const calculated = expected[index]!;
+    if (!object(item) || !exact(result, ["capacityKwh", "investmentEur", "annualEnergySavingEur", "low", "base", "high"]) || result.capacityKwh !== CAPACITIES[index] || result.investmentEur !== a.investmentsEur[String(result.capacityKwh)] || !close(calculated.annualEnergySavingEur, result.annualEnergySavingEur)) return false;
+    return [result.low, result.base, result.high].every((scenario: unknown, scenarioIndex: number) => {
+      const s = scenario as AnyObject;
+      const calculatedScenario = calculated[["low", "base", "high"][scenarioIndex] as "low" | "base" | "high"];
+      return object(scenario) && exact(s, ["annualFactor", "cashflowsEur", "npvEur", "paybackYears"]) && s.annualFactor === calculatedScenario.annualFactor && Array.isArray(s.cashflowsEur) && s.cashflowsEur.length === a.lifeYears && s.cashflowsEur.every((cashflow: unknown, cashflowIndex: number) => close(calculatedScenario.cashflowsEur[cashflowIndex]!, cashflow)) && close(calculatedScenario.npvEur, s.npvEur) && (calculatedScenario.paybackYears === null ? s.paybackYears === null : close(calculatedScenario.paybackYears, s.paybackYears));
+    });
+  }) && v.recommendedCapacityKwh === expectedRecommendation;
 };
 
 export const validateCentralResult = (key: CentralResultKey, value: unknown): boolean => {
