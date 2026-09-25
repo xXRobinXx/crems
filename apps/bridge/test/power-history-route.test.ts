@@ -92,7 +92,7 @@ test("weigert ontbrekende lege dubbele en ongeldige querywaarden vóór de loade
       assert.equal(response.status, 400);
       assert.equal(response.headers["content-type"], "application/json");
       assert.equal(response.headers["cache-control"], "no-store");
-      assert.equal(response.headers["access-control-allow-origin"], "*");
+      assert.equal(response.headers["access-control-allow-origin"], undefined);
       assert.deepEqual(response.body, {
         error: { code: "INVALID_HISTORY_QUERY", message: "De historyquery is ongeldig" },
       });
@@ -126,7 +126,7 @@ test("begrensd venster is positief en accepteert normale 24 uur met canonieke of
     assert.equal(valid.status, 200);
     assert.equal(valid.headers["content-type"], "application/json");
     assert.equal(valid.headers["cache-control"], "no-store");
-    assert.equal(valid.headers["access-control-allow-origin"], "*");
+    assert.equal(valid.headers["access-control-allow-origin"], undefined);
     assert.deepEqual(valid.body, responseFor("2026-01-01T10:00:00.000Z", "2026-01-02T10:00:00.000Z"));
   });
   assert.deepEqual(calls, [{
@@ -170,7 +170,7 @@ test("accepteert end gelijk aan now en weigert toekomst vóór de loader", async
   assert.equal(loaderCalls, 1);
 });
 
-test("route accepteert alleen GET en behoudt veilige JSON no-store en CORS-headers", async () => {
+test("route accepteert alleen GET en behoudt veilige JSON no-store zonder cross-origin toegang", async () => {
   await withRouteServer(async (_source, start, end) => responseFor(start, end), async (port) => {
     const response = await requestJson(
       port,
@@ -180,12 +180,12 @@ test("route accepteert alleen GET en behoudt veilige JSON no-store en CORS-heade
     assert.equal(response.status, 405);
     assert.equal(response.headers["content-type"], "application/json");
     assert.equal(response.headers["cache-control"], "no-store");
-    assert.equal(response.headers["access-control-allow-origin"], "*");
-    assert.equal(response.headers["access-control-allow-headers"], "Content-Type");
+    assert.equal(response.headers["access-control-allow-origin"], undefined);
+    assert.equal(response.headers["access-control-allow-headers"], undefined);
   });
 });
 
-test("productiecompositie geeft history-OPTIONS 405 maar behoudt overige OPTIONS als 204", async () => {
+test("productiecompositie laat history-OPTIONS afwijzen en verleent geen cross-origin preflight", async () => {
   const source = new SimulatedP1Source();
   const server = createServer((request, response) => {
     if (!handleBridgeRoutePrelude(request, response, source)) {
@@ -206,10 +206,7 @@ test("productiecompositie geeft history-OPTIONS 405 maar behoudt overige OPTIONS
     });
     const current = await requestJson(address.port, "/api/current", "OPTIONS");
     assert.equal(current.status, 204);
-    assert.equal(current.body, undefined);
-    assert.equal(current.headers["access-control-allow-origin"], "*");
-    assert.equal(current.headers["access-control-allow-headers"], "Content-Type");
-    assert.equal(current.headers["cache-control"], "no-store");
+    assert.equal(current.headers["access-control-allow-origin"], undefined);
   } finally {
     await new Promise<void>((resolve, reject) => {
       server.close((error) => error ? reject(error) : resolve());

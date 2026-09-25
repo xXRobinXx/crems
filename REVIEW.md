@@ -1,5 +1,89 @@
 # Review
 
+## Task 054 — onafhankelijke audit-follow-up — 25 september 2026
+
+De Astra-agent was door een usage-limiet niet inzetbaar; een aparte read-only agent (`/root/pi_api_audit`, exact onderliggend model niet zichtbaar in de runtime) vond een fout Ingress-basispad, geen server-side Supervisor-peerrestrictie, wildcard CORS op bridge-routes, incomplete livewaarden die als nul zichtbaar bleven, een centrale opslagfout die door een lege sibling-response kon worden overschreven en aanvankelijk een genormaliseerd pad dat niet naar routehandlers werd doorgegeven. Alle codepunten kregen regressies; de laatste read-only hercontrole vond geen concrete codebevindingen. Officiële HA-richtlijn bevestigt de verplichte peer `172.30.32.2` en documenteert `X-Ingress-Path`.
+
+**Automatisch bewijs:** volledige build PASS; core 65/65, web 121/121, bridge 91/91; typecheck alle workspaces PASS; harness 5/5 PASS; diff-check PASS. Regressies staan in `apps/bridge/test/ingress.test.ts`, `apps/bridge/test/production-start.test.ts` en `apps/web/test/battery-flow-structure.test.ts`.
+
+**Reviewbesluit:** codefixes voldoen aan de regressiecriteria. Productreview `CHANGES REQUIRED / NOT DEPLOYED` blijft van kracht omdat visueel gedrag een actuele Agent C PASS vereist en de image/Pi niet zijn gepubliceerd/geïnstalleerd. Externe blockers staan bij Tasks 052/053.
+
+## Task 045 — kwaliteitslabels meterbronnen — 25 september 2026
+
+Bridge-leesdata krijgt `incomplete` wanneer import- of exportvermogen ontbreekt/ongeldig is; alleen twee geldige kanalen leveren `measured`. De simulator meldt `estimated`. Regressietest dekt ontbrekend en `unknown` import met expliciete nul-export. Bridge-tests: 84/84 PASS; bridge-typecheck PASS. Review door root bevestigt diff en geen wijziging buiten write set. Browsergate is niet van toepassing op deze bronsemantiekwijziging.
+
+## Task 046 — opslagherstelstate — in uitvoering
+
+Auditbevinding: bridge-opslag las corrupte/ongeldige data als leeg en liet een volgende write deze overschrijven. `CentralStorage` onderscheidt nu ENOENT van corrupte/te grote/ongeldige inhoud. GET, PUT en DELETE krijgen een vaste recovery-fout; opslagbytes blijven ongewijzigd. Bridge 84/84, typecheck PASS en root code-review PASS.
+
+## Task 047 — imagecontext privacy — in uitvoering
+
+Read-only Astra-audit vond dat `apps/bridge/data/runtime/results.json` mee de Docker-context en image-layers in kon gaan. `.gitignore` en `.dockerignore` sluiten runtime-resultaten en geheimen uit; de Dockerfile kopieert alleen het BELPEX-archief. Regressietest slaagt; bridge 85/85 en typecheck PASS. Geen runtime-opslag gelezen en geen image gepubliceerd.
+
+## Task 048 — Pi-ingressbeveiliging — in uitvoering
+
+Read-only Astra-audit vond ongeauthenticeerde storage op rechtstreeks gepubliceerde poort 8099. Beide manifests bieden de app nu uitsluitend via Home Assistant Ingress aan, zonder directe poort of webui-URL. Configregressie en bridge-suite 86/86 PASS. Pi zelf nog niet bijgewerkt; daadwerkelijke installatie blijft deploymentgate.
+
+## Task 049 — financiële centrale snapshots — in uitvoering
+
+Herstel van Astra-bevinding: strikte nested investeringssleutels en contractdekking van de volledige meetperiode in centrale bridge-opslagvalidator. Regressies weigeren buitenperiode en geneste extra velden. Bridge 86/86, typecheck PASS en code-review PASS.
+
+## Task 050 — consistente addon/imageversie — goedgekeurd
+
+Rootmanifest wees nog 0.1.7 aan, terwijl addonmanifest en workflow 0.1.8 gebruikten. Beide manifesten zijn 0.1.9; workflow valideert tag/input tegen beide configversies en gebruikt de gevalideerde waarde als image-tag. Bridge 87/87, typecheck PASS, configtest PASS. Geen image push tijdens dit werk.
+
+## Task 051 — centrale opslag en lokale kopieën — in uitvoering
+
+Code-inspectie vond dat een centrale `empty` response de browseropslag expliciet verwijderde. De nieuwe flow behoudt lokale state bij `empty` en fouten, gebruikt geldige remote data uitsluitend bij `present` en toont een veilige status. Fake-fetch componenttest bewijst bytes en getoonde rapporten blijven behouden; webtests 119/119 PASS. Rootreview PASS.
+
+## Task 042 — volledige audit — 24 september 2026
+
+Oorspronkelijke audit met root-controle en gedeeltelijke Astra-read-only input; Astra werd onderbroken door een usage-limiet. De vier toenmalige P1-codegebieden zijn hersteld in Tasks 045–051. Onafhankelijke follow-up vond extra Ingress-/presentatiepunten; codefixes staan in Task 054 met groene automatische regressies. De historische bevindingen hierboven zijn geen actuele blockers. De actuele release blijft `CHANGES REQUIRED / NOT DEPLOYED` wegens open Agent C-browser-PASS, HAOS-imagepublicatie/installatie en toegestane contract-API-toegang; zie Tasks 052/053 en de auditfollow-up van 25 september.
+
+## Task 041 — rechtstreekse Belgische spotprijzen — 24 september 2026
+
+De bestaande prijsroute gebruikt nu server-side Energy-Charts v2 voor BE, zonder Home Assistant. Eén driedaagse opvraag bevat expliciete kwartierintervallen; EUR/MWh wordt naar ct/kWh omgerekend en de bron/licentie zijn zichtbaar. De bridge valideert metadata en dekking, cachet tien minuten en laat ontbrekende of nog niet gepubliceerde kwartieren leeg. De webapp vraagt prijsdata ook op wanneer Home Assistant niet verbonden is; alleen de vermogensmeting blijft aan Home Assistant gekoppeld.
+
+Bewijs: echte publieke API en tijdelijke lokale bridge-route leveren voor gisteren en vandaag ieder 96 kwartieren met `measured`, morgen `notPublished` met nul punten. De volledige bridge-suite slaagt 83/83 en websuite 115/115; extra webweergavetest zonder Home Assistant slaagt. Bridge en web bouwen en typechecken. Het publieke antwoord vermeldt voor BE CC BY 4.0 van Bundesnetzagentur | SMARD.de. De tijdelijke bridge is na controle gestopt. Geen browser-PASS of afzonderlijke reviewgoedkeuring; status `READY FOR BROWSER REVIEW`.
+
+Na de melding dat de grafiek in de browser ontbreekt, is de lokale runtime gecontroleerd: web HTTP 200, prijsproxy 502 en geen luisterende bridge op poort 8787. `tsx watch` startte een proces zonder de bridge bereikbaar te maken. De ontwikkelscript is vereenvoudigd naar `tsx src/server.ts`. Een nieuwe gecombineerde `pnpm dev` start beide servers; dezelfde browserproxy retourneert daarna `measured`, 96 kwartieren en de directe bronvermelding. Er is nog geen browser-PASS of bewijs voor een andere browser-URL/Raspberry Pi-installatie.
+
+Een gedeelde screenshot van `127.0.0.1:5173` liet daarna aanhoudend “laden…” voor morgen en geen volgende-uurprijs zien. Root vond een StrictMode-lifecyclefout in beide grafiekcontrollers: effect-opruiming annuleerde de initiële aanvraag, maar de selectiesleutel verhinderde de herstart. Beide `dispose()`-methoden wissen nu de sleutel; regressies bewijzen dat hetzelfde dagverzoek opnieuw start en succesvol wordt gepubliceerd. Web 118/118 tests en typecheck slagen. De live bundel bevat de reset; de webproxy levert nog steeds 96 kwartieren vandaag. Visuele browser-PASS na de correctie blijft open.
+
+## Spotprijzen — 24 september 2026
+
+Een concrete dagselectiefout is hersteld: `yesterday` kon `raw_tomorrow` op de huidige prijssensor gebruiken. Die selectie gebruikt nu altijd Home Assistant-history. Een synthetische regressie bewijst dat een aanwezig `raw_tomorrow` wordt genegeerd en de historische waarde wordt geretourneerd. Alle 9 gerichte prijsservicetests slagen buiten de beperkte sandbox; de volledige bridgetestrun kon daar niet starten door `uv_os_get_passwd`/`ENOMEM`. De lokale prijsroute was niet bereikbaar, dus er is nog geen live vergelijking of browser-PASS. Reviewstatus blijft open.
+
+Na gebruikersverduidelijking gebruikt vandaag bij voorkeur de gepubliceerde `raw_today`-reeks van de ingestelde dagprijssensor. De grafiek tekent die ook na het huidige tijdstip tot de daggrens; history zonder gepubliceerde toekomst blijft begrensd. De nieuwe regressies voor plannerbron en volledige vandaaggrafiek slagen: 10/10 prijsservicetests en 13/13 gerichte webprijstests. Bridge en web typecheck en build slagen; de webbuild vereiste uitvoering buiten de beperkte sandbox wegens een padtoegangsfout. Er is nog geen live replay of browser-PASS; reviewstatus blijft open.
+
+Op de vervolgvraag over spotdata zijn ook gisteren en de twee overzichtskaarten op dezelfde geconfigureerde dagprijssensor aangesloten. Een test bewijst dat gisteren de history van deze sensor gebruikt in plaats van de afzonderlijke huidige-uursensor. De kaarten halen hun waarde uit de vandaagreeks, inclusief nul en negatieve prijzen, en tonen leeg bij een ontbrekend interval. Controle: 11/11 gerichte bridge-prijsservicetests, 16/16 gerichte webtests, bridge-typecheck en webbuild geslaagd. Live replay en browser-PASS ontbreken nog.
+
+## Task 040 — statusduur van prijshistorie — 23 september 2026
+
+Agent B heeft optionele bronbevestigde eindtijden voor Home Assistant-history toegevoegd. Een geldige status loopt tot de volgende wijziging, inclusief `unavailable` als grens; een onplaatsbare tijd verbergt conservatief alle intervallen. Gepubliceerde prijzen en oude punten zonder eindtijd behouden hun bestaande verwerking. De gecombineerde grafiek blijft behouden. Agent A heeft de gewijzigde code en tests gelezen; geen concrete codebevinding gevonden.
+
+Bewijs: typecheck groen in core, bridge en web; buiten de beperkte sandbox slagen 76/76 bridgetests, 114/114 webtests en webbuild. Bridge en webserver leveren HTTP 200. De echte prijs-API levert gisteren 22 punten met 22 eindtijden, waaronder drie intervallen van minstens twee uur; vandaag 11 punten met 11 eindtijden, waaronder één lang interval. Morgen is momenteel `notPublished`. De eerdere ENOMEM/esbuild-fouten waren omgevingsbeperkingen. Agent C probeerde browser-QA na expliciete gebruikersopdracht; de provider gaf `apps:[]`, `browsers:[]` en meldde iab, Chrome en Edge onbeschikbaar. Er is geen zichtbare PASS of app-FAIL. Status: `READY FOR BROWSER REVIEW`; nog geen `APPROVED`.
+
+## Task 039 — prijsstappen in plaats van puntjes — 22 september 2026
+
+Validatie afgerond: 14/14 gerichte prijs-/overzichttests geslaagd, webbuild en webtypecheck groen. Overzichtfixture gebruikt drie prijspunten en een vaste klok; bestaande gecombineerde-grafiekassertions behouden. READY FOR BROWSER REVIEW, niet volledig APPROVED.
+
+De exacte globale cadencecheck blokkeerde historie met circa uurupdates en secondenafwijkingen. Twee ondersteunende deltas binnen vijf seconden onderbouwen nu een kwartier-/uurcadence. Het gedeeltelijke eerste interval is alleen toegestaan vanaf het responsebegin. Aangrenzende intervallen krijgen verticale stappen; lange gaten blijven onderbroken, geïsoleerde onzekere punten behouden markers. Afgeleide duur blijft zichtbaar benoemd; vandaag wordt niet voorbij nu verlengd. Root replay van echte API: gisteren 22 intervallen in drie lijnsegmenten, vandaag 19 in vier segmenten en morgen 96 in één volledige traplijn; nul geïsoleerde markers in alle drie. De webserver levert de nieuwe berekening met HTTP 200. Agent C read-only review van productiecode heeft geen resterende bevindingen. Browsergate blijft open.
+
+## Task 038 — morgenprijzen na live meterupdates — 22 september 2026
+
+`detect()` behoudt bestaande entityconfiguratie voordat automatisch gedetecteerde velden worden bijgewerkt. Daardoor gaat `tomorrowPrice` niet meer verloren. Regressie reproduceerde eerst HISTORY_NOT_CONFIGURED na drie live reads; met fix bewijst dezelfde test de juiste GET-volgorde en nul-/negatieve morgenprijzen. Agent B: 74/74 bridgetests, build en typecheck groen. Agent C: geen resterende codebevindingen. Root heeft diff beoordeeld en dataservice herstart: echte webproxy levert HTTP 200, quality measured en 96 morgenprijzen terwijl de meterupdates measured zijn. Status READY FOR BROWSER REVIEW; geen visueel browserbewijs of volledige APPROVED-claim.
+
+## Task 037 — gecombineerde grafiek hersteld — 22 september 2026
+
+Expliciete gebruikerscorrectie vervangt de opsplitsing: vandaag/gisteren tonen prijs en vermogen weer in één SVG, met watt links en ct/kWh rechts. Morgen behoudt uitsluitend prijs. Intervalberekening, tijdlabels, compacte min/max en opvraagbare waarden zijn behouden. Agent B rapporteert 10/10 gerichte tests en webtypecheck groen. Root controleerde de gewijzigde component en de geleverde bundel: HTTP 200 en gecombineerde assen aanwezig. Runtime-renderregressies dekken één SVG met beide series, morgen zonder vermogen en prijsfout met behoud van vermogen. Visuele browsergate blijft open; niet APPROVED.
+
+## Task 037 — overzicht en prijsgrafieken — 21 september 2026
+
+Code review: de prijs- en vermogensgrafieken gebruiken hetzelfde Brusselse dagframe en tonen tussentijdlabels. Prijsintervallen worden alleen afgeleid bij herkenbare regelmatige uur-/kwartierstappen; gaten worden niet opgevuld en een ononderbouwd laatste einde blijft expliciet onbekend. Laagste/hoogste gepubliceerde prijs, negatieve waarden en nul blijven zichtbaar. Prijs- en vermogenswaarden zijn via openklapbare, toetsenbordbereikbare lijsten beschikbaar. Batterijgrafieken verliezen de vaste mobiele minimumbreedte.
+
+Gerichte webtests voor prijs- en vermogensgrafieken: 13/13 geslaagd. Webtypecheck: geslaagd. De volledige webtest-run bevatte 95 geslaagde tests en één bestaande harness-buildfout door de lokale sandbox die het absolute `apps/web/src/App.tsx`-pad niet mag lezen; de fout ontstond vóór de assertions van die harness-test. Webbuild kon om dezelfde sandboxtoegangsbeperking niet afronden. Status: READY FOR BROWSER REVIEW; geen browserbediening uitgevoerd en dus geen browser-PASS of APPROVED.
+
 ## Periodefilter capaciteitsgrafiek — 12 september 2026
 
 Van/Tot en met en Volledige periode sturen uitsluitend de grafiek 'Minder netafname per batterij'. Dagsommen behouden lading van vóór de selectie. Eindgrens is de Brusselse dag van periode.einde minus één milliseconde. Ongeldige/lege bereiken en oude rapporten zonder dagdata zijn expliciet afgehandeld. Root heeft code gecontroleerd en build, alle tests (65 core/92 web/67 bridge) en typecheck met succes uitgevoerd. De webserver levert de nieuwe filtercode. Status READY FOR BROWSER REVIEW; geen browserbediening uitgevoerd en geen browser-PASS.

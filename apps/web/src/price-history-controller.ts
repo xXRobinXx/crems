@@ -9,5 +9,6 @@ export const createPriceHistoryController = (publish: (state: PriceHistoryState)
   const schedule = (current: number) => { if (!visible || day === "yesterday") return; timer = dependencies.setInterval(() => { void run(day, current, true); }, 10 * 60_000); };
   const update = (nextEnabled: boolean, nextDay: DaySelection) => { const next = `${nextEnabled}:${nextDay}`; if (next === key) return; key = next; clear(); last = undefined; enabled = nextEnabled; day = nextDay; if (!enabled) { publish({ status: "unavailable" }); return; } if (!visible) { publish({ status: "loading" }); return; } const current = sequence; void run(day, current); schedule(current); };
   const setVisibility = (nextVisible: boolean) => { if (visible === nextVisible) return; visible = nextVisible; if (!visible) { if (timer !== undefined) dependencies.clearInterval(timer); timer = undefined; return; } if (!enabled || day === "yesterday") return; const current = sequence; void run(day, current, Boolean(last)); schedule(current); };
-  return { update, setVisibility, dispose: clear };
+  const dispose = () => { clear(); key = ""; last = undefined; enabled = false; };
+  return { update, setVisibility, dispose };
 };

@@ -25,7 +25,7 @@ CREMS gebruikt de cyclus **Requirement → Plan → één taak → Implementatie
 - controleert na implementatie vanuit een schoon profiel én relevante bestaande lokale toestand;
 - rapporteert per scenario PASS/FAIL met URL, viewport, stappen, verwacht en werkelijk gedrag;
 - bewaart maximaal drie privacyveilige screenshots per taak.
-- bestuurt de browser uitsluitend wanneer de gebruiker dat in de actuele opdracht expliciet vraagt; ambient browsercontext is nooit toestemming. Anders wordt de gate uitgevoerd met automatische tests en door de gebruiker aangeleverde screenshots.
+- bestuurt de browser uitsluitend wanneer de gebruiker dat in de actuele opdracht expliciet vraagt; ambient browsercontext is nooit toestemming. Anders rapporteert Agent C de browsergate als `NOT RUN` en gebruikt code/tests of door de gebruiker aangeleverde screenshots alleen als aanvullend bewijs.
 
 ## File ownership en parallelisme
 
@@ -40,6 +40,10 @@ CREMS gebruikt de cyclus **Requirement → Plan → één taak → Implementatie
 
 Zichtbaar gedrag is nooit `APPROVED` zonder Agent C PASS. Build, typecheck en unit tests vervangen dit niet.
 
+Een volledige audit mag bevindingen vastleggen zonder browserbediening. Een auditstatus is nooit een browser-PASS en zet geen historische taak automatisch op `APPROVED`. Open P1/P2-bevindingen blijven `CHANGES REQUIRED` totdat een afzonderlijke hersteltaak en regressiebewijs bestaan.
+
+Voor een Astra-audit wordt de modelkeuze expliciet in het auditrapport vermeld. Astra is een onafhankelijke reviewer; hij schrijft geen productiecode, tests of instructiedocumenten en mag geen reviewstatus wijzigen. Als Astra door usage- of toolgrenzen niet kan afronden, wordt alleen het werkelijk ontvangen bewijs gebruikt en blijft de audit expliciet gedeeltelijk.
+
 Minimaal bewijs:
 
 1. happy path vanuit schoon profiel;
@@ -51,6 +55,8 @@ Minimaal bewijs:
 7. privacycontrole: geen CSV-inhoud, identifier of secret in scherm, opslag, fouttekst of screenshot.
 
 Iedere FAIL bevat reproduceerbare stappen. Met een open FAIL is alleen `CHANGES REQUIRED` of `BLOCKED` toegestaan.
+
+Securityreview van Home Assistant Ingress controleert ook productiegedrag: geneste Ingress-assets en API/SSE-routes moeten werken, de add-onserver accepteert alleen peer `172.30.32.2`, en centrale resultaatroutes verlenen geen wildcard CORS. Manifesttekst alleen bewijst geen toegangscontrole.
 
 ## Bestaande verantwoordelijkheden Agent A
 

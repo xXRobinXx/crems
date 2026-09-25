@@ -57,3 +57,13 @@ test("muteert diep bevroren input niet", () => {
   normalizePriceHistory(Object.freeze({ records, unit: "EUR/kWh", ...window }));
   assert.equal(record.state, "0.4");
 });
+
+import {normalizePriceHistoryIntervals} from "../src/price-history.ts";
+test("historyintervallen behouden lange statusduur en blokkeren onplaatsbare records",()=>{
+ const input={start:"2026-09-01T00:00:00Z",end:"2026-09-02T00:00:00Z",unit:"EUR/kWh",records:[{last_changed:"2026-09-01T00:00:00Z",state:"0"},{last_changed:"2026-09-01T03:00:00Z",state:"0"}]};
+ assert.deepEqual(normalizePriceHistoryIntervals(input).points.map(p=>p.end),["2026-09-01T03:00:00.000Z","2026-09-02T00:00:00.000Z"]);
+ for(const invalid of [null,{last_changed:null,state:"0"},{last_changed:"broken",state:"unknown"}])assert.deepEqual(normalizePriceHistoryIntervals({...input,records:[...input.records,invalid]}).points,[]);
+ const duplicate=normalizePriceHistoryIntervals({...input,records:[...input.records,{last_changed:"2026-09-01T03:00:00Z",state:"unavailable"},{last_changed:"2026-09-01T05:00:00Z",state:"1"}]});
+ assert.deepEqual(duplicate.points.map(p=>[p.timestamp,p.end]),[["2026-09-01T00:00:00.000Z","2026-09-01T03:00:00.000Z"],["2026-09-01T05:00:00.000Z","2026-09-02T00:00:00.000Z"]]);
+ assert.ok(duplicate.duplicateCount>0);
+});

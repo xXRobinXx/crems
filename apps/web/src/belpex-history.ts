@@ -9,7 +9,7 @@ const pointIsValid = (value: unknown): value is BelpexPoint => {
 
 export async function loadBelpexHistory(start: string, end: string, request: typeof fetch = fetch, signal?: AbortSignal): Promise<BelpexHistory | undefined> {
   try {
-    const response = await request(`/api/history/belpex?${new URLSearchParams({ start, end })}`, { method: "GET",signal });
+    const response = await request(`api/history/belpex?${new URLSearchParams({ start, end })}`, { method: "GET",signal });
     if (!response.ok) return undefined;
     const value = await response.json() as Partial<BelpexHistory>;
     if (!value || value.quality !== "complete" || value.unit !== "EUR/MWh" || typeof value.source !== "string" || !Array.isArray(value.points) || !value.points.every(pointIsValid)) return undefined;

@@ -20,8 +20,8 @@ await build({
 });
 
 const html = (await readFile(resolve(root, "index.html"), "utf8"))
-  .replace('<script type="module" src="/src/main.tsx"></script>', '<script type="module" src="/assets/app.js"></script>')
-  .replace("</head>", '    <link rel="stylesheet" href="/assets/app.css" />\n  </head>');
+  .replace('<script type="module" src="/src/main.tsx"></script>', '<script type="module" src="assets/app.js"></script>')
+  .replace("</head>", '    <link rel="stylesheet" href="assets/app.css" />\n  </head>');
 
 await writeFile(resolve(dist, "index.html"), html);
 try {

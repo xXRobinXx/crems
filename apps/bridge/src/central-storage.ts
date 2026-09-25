@@ -6,6 +6,7 @@ const CAPACITIES = [3, 5, 7, 10, 13] as const;
 const ENERGY_FIELDS = ["sourceImportKwh", "sourceExportKwh", "netImportBeforeKwh", "netExportBeforeKwh", "chargedKwh", "dischargedKwh", "netImportAfterKwh", "netExportAfterKwh", "conversionLossKwh", "resetLossKwh"] as const;
 const ENERGY_KEYS = ["version", "savedAt", "period", "measuredImportKwh", "estimatedImportKwh", "measuredExportKwh", "estimatedExportKwh", "measuredCount", "estimatedCount", "noConsumptionCount", "integrityReliable", "gapCount", "duplicateCount", "overlapCount"];
 const BATTERY_KEYS = ["version", "savedAt", "quality", "technical", "priceSource", "financial", "daily"];
+const RESULT_KEYS: readonly CentralResultKey[] = ["energy-profile", "battery-report"];
 const MAX_RESULTS_BYTES = 4 * 1024 * 1024;
 type AnyObject = Record<string, any>;
 
@@ -64,8 +65,8 @@ const validFinancial = (value: unknown, quality: AnyObject, technical: any[]) =>
   const v = value as AnyObject;
   if (!object(value) || !exact(v, ["assumptions", "results", "recommendedCapacityKwh"]) || !object(v.assumptions) || !Array.isArray(v.results) || v.results.length !== 5) return false;
   const a = v.assumptions as AnyObject;
-  if (!exact(a, ["confirmed", "importRateCtKwh", "exportRateCtKwh", "lifeYears", "annualDegradationPercent", "discountRatePercent", "investmentsEur", "contractName", "contractType", "effectiveStart", "effectiveEnd", "quoteSource", "quoteDate", "warrantyYears", "pricesIncludeVat"]) || a.confirmed !== true || a.pricesIncludeVat !== true || typeof a.contractName !== "string" || a.contractName.trim() === "" || typeof a.quoteSource !== "string" || a.quoteSource.trim() === "" || (a.contractType !== "fixed" && a.contractType !== "variable") || !date(a.effectiveStart) || !date(a.effectiveEnd) || Date.parse(a.effectiveEnd) <= Date.parse(a.effectiveStart) || !date(a.quoteDate) || !Number.isInteger(a.lifeYears) || a.lifeYears < 1 || a.lifeYears > 30 || !Number.isInteger(a.warrantyYears) || a.warrantyYears < 1 || a.warrantyYears > 30 || ![a.importRateCtKwh, a.exportRateCtKwh, a.annualDegradationPercent, a.discountRatePercent].every(nonNegative) || a.annualDegradationPercent >= 100 || a.discountRatePercent >= 100 || !object(a.investmentsEur) || !CAPACITIES.every((capacity) => nonNegative(a.investmentsEur[String(capacity)]) && a.investmentsEur[String(capacity)] > 0)) return false;
-  if (!validQuality(quality) || !Array.isArray(technical) || !quality.integrityReliable || quality.estimatedCount !== 0 || quality.gapCount !== 0 || quality.duplicateCount !== 0 || quality.overlapCount !== 0 || Date.parse(quality.period.end) - Date.parse(quality.period.start) < 365 * 86_400_000) return false;
+  if (!exact(a, ["confirmed", "importRateCtKwh", "exportRateCtKwh", "lifeYears", "annualDegradationPercent", "discountRatePercent", "investmentsEur", "contractName", "contractType", "effectiveStart", "effectiveEnd", "quoteSource", "quoteDate", "warrantyYears", "pricesIncludeVat"]) || a.confirmed !== true || a.pricesIncludeVat !== true || typeof a.contractName !== "string" || a.contractName.trim() === "" || typeof a.quoteSource !== "string" || a.quoteSource.trim() === "" || (a.contractType !== "fixed" && a.contractType !== "variable") || !date(a.effectiveStart) || !date(a.effectiveEnd) || Date.parse(a.effectiveEnd) <= Date.parse(a.effectiveStart) || !date(a.quoteDate) || !Number.isInteger(a.lifeYears) || a.lifeYears < 1 || a.lifeYears > 30 || !Number.isInteger(a.warrantyYears) || a.warrantyYears < 1 || a.warrantyYears > 30 || ![a.importRateCtKwh, a.exportRateCtKwh, a.annualDegradationPercent, a.discountRatePercent].every(nonNegative) || a.annualDegradationPercent >= 100 || a.discountRatePercent >= 100 || !object(a.investmentsEur) || !exact(a.investmentsEur, CAPACITIES.map(String)) || !CAPACITIES.every((capacity) => nonNegative(a.investmentsEur[String(capacity)]) && a.investmentsEur[String(capacity)] > 0)) return false;
+  if (!validQuality(quality) || !Array.isArray(technical) || !quality.integrityReliable || quality.estimatedCount !== 0 || quality.gapCount !== 0 || quality.duplicateCount !== 0 || quality.overlapCount !== 0 || Date.parse(quality.period.end) - Date.parse(quality.period.start) < 365 * 86_400_000 || Date.parse(a.effectiveStart) > Date.parse(quality.period.start) || Date.parse(a.effectiveEnd) < Date.parse(quality.period.end)) return false;
   const years = (Date.parse(quality.period.end) - Date.parse(quality.period.start)) / (365.2425 * 86_400_000);
   const expectedScenario = (annualSaving: number, investment: number, annualFactor: 0.8 | 1 | 1.2): AnyObject => {
     const degradation = 1 - a.annualDegradationPercent / 100;
@@ -127,15 +128,24 @@ export class CentralStorage {
   async remove(key: CentralResultKey) { return this.serialized(async () => { const current = await this.read(); delete current[key]; await this.write(current); }); }
   private serialized(operation: () => Promise<void>) { const next = this.queue.then(operation, operation); this.queue = next.catch(() => undefined); return next; }
   private async read(): Promise<StoredResults> {
+    let raw: string;
     try {
-      const raw = await readFile(this.file, "utf8");
-      if (Buffer.byteLength(raw, "utf8") > MAX_RESULTS_BYTES) return {};
-      const value: unknown = JSON.parse(raw); if (!object(value)) return {};
-      const result: StoredResults = {};
-      if (value["energy-profile"] !== undefined && validateCentralResult("energy-profile", value["energy-profile"])) result["energy-profile"] = value["energy-profile"];
-      if (value["battery-report"] !== undefined && validateCentralResult("battery-report", value["battery-report"])) result["battery-report"] = value["battery-report"];
-      return result;
-    } catch { return {}; }
+      raw = await readFile(this.file, "utf8");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return {};
+      throw error;
+    }
+    if (Buffer.byteLength(raw, "utf8") > MAX_RESULTS_BYTES) throw new StorageCorruptError();
+    let value: unknown;
+    try { value = JSON.parse(raw); } catch { throw new StorageCorruptError(); }
+    if (!object(value) || Object.keys(value).some((key) => !RESULT_KEYS.includes(key as CentralResultKey))) throw new StorageCorruptError();
+    const result: StoredResults = {};
+    for (const key of RESULT_KEYS) {
+      if (value[key] === undefined) continue;
+      if (!validateCentralResult(key, value[key])) throw new StorageCorruptError();
+      result[key] = value[key];
+    }
+    return result;
   }
   private async write(value: StoredResults) {
     await mkdir(this.directory, { recursive: true });
@@ -145,3 +155,4 @@ export class CentralStorage {
   }
 }
 export class StorageValidationError extends Error { constructor() { super("invalid_result"); this.name = "StorageValidationError"; } }
+export class StorageCorruptError extends Error { constructor() { super("corrupt_store"); this.name = "StorageCorruptError"; } }

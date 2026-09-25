@@ -50,3 +50,16 @@ test("selectiewissel abort oude request en negeert stale resolve en reject", asy
   s.controller.update(true, "tomorrow"); assert.equal(old.signal.aborted, true); staleResolve(); await flush(); assert.equal(s.states.at(-1)?.status, "future");
   const r = setup(); r.controller.update(true, "today"); const staleReject = r.reject; r.controller.update(true, "tomorrow"); staleReject(); await flush(); assert.equal(r.states.at(-1)?.status, "future");
 });
+
+test("na effect-opruiming herstart dezelfde dag onder React StrictMode", async () => {
+  const s = setup();
+  s.controller.update(true, "today");
+  const first = s.calls[0]!;
+  s.controller.dispose();
+  assert.equal(first.signal.aborted, true);
+  s.controller.update(true, "today");
+  assert.equal(s.calls.length, 2);
+  s.resolve();
+  await flush();
+  assert.equal(s.states.at(-1)?.status, "success");
+});

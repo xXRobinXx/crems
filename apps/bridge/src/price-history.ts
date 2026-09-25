@@ -69,3 +69,25 @@ export const normalizePriceHistory = (input: Readonly<NormalizePriceHistoryInput
     duplicateCount,
   };
 };
+
+// History is a stream of state changes. Every timestamp (including unavailable)
+// is a boundary. Ambiguous timestamps cannot safely establish any duration.
+export const normalizePriceHistoryIntervals = (input: Readonly<NormalizePriceHistoryInput>): NormalizePriceHistoryResult & {points: Array<{timestamp:string;priceCtKwh:number;end:string}>} => {
+  const normalized = normalizePriceHistory(input);
+  const boundaries = new Map<number,number>();
+  for (const value of input.records) {
+    const record = recordOf(value);
+    const timestamp = record && instant(Object.hasOwn(record,"last_changed") ? record.last_changed : record.last_updated);
+    if (timestamp === undefined) return {...normalized,points:[],invalidCount:Math.max(1,normalized.invalidCount)};
+    boundaries.set(timestamp,(boundaries.get(timestamp)??0)+1);
+  }
+  const ordered=[...boundaries.keys()].sort((a,b)=>a-b);
+  const ends=new Map(ordered.map((time,index)=>[time,Math.min(ordered[index+1]??Infinity,Date.parse(input.end))]));
+  let ambiguous=0;
+  const points=normalized.points.flatMap(point=>{
+    const time=Date.parse(point.timestamp),end=ends.get(time)!;
+    if(boundaries.get(time)!>1){ambiguous++;return [];}
+    return end>time?[{...point,end:new Date(end).toISOString()}]:[];
+  });
+  return {...normalized,points,duplicateCount:Math.max(normalized.duplicateCount,ambiguous)};
+};

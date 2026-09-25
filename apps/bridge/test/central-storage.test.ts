@@ -4,7 +4,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { CentralStorage, validateCentralResult } from "../src/central-storage.js";
+import { CentralStorage, StorageCorruptError, validateCentralResult } from "../src/central-storage.js";
 import { handleCentralStorageRequest } from "../src/central-storage-route.js";
 
 const profile = {
@@ -70,6 +70,8 @@ test("central storage recomputes financial snapshots and requires eligible quali
   assert.equal(validateCentralResult("battery-report", { ...valid, financial: { ...valid.financial, results: valid.financial.results.map((item, index) => index === 0 ? { ...item, base: { ...item.base, npvEur: item.base.npvEur + 1 } } : item) } }), false);
   assert.equal(validateCentralResult("battery-report", { ...valid, financial: { ...valid.financial, recommendedCapacityKwh: 3 } }), false);
   assert.equal(validateCentralResult("battery-report", { ...valid, quality: { ...valid.quality, gapCount: 1 } }), false);
+  assert.equal(validateCentralResult("battery-report", { ...valid, financial: { ...valid.financial, assumptions: { ...valid.financial.assumptions, effectiveStart: "2025-01-02T00:00:00Z" } } }), false);
+  assert.equal(validateCentralResult("battery-report", { ...valid, financial: { ...valid.financial, assumptions: { ...valid.financial.assumptions, investmentsEur: { ...valid.financial.assumptions.investmentsEur, personalData: "unexpected" } } } }), false);
 });
 
 test("central storage writes atomically and preserves concurrent result types", async () => {
@@ -84,17 +86,16 @@ test("central storage writes atomically and preserves concurrent result types", 
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
 
-test("corrupt storage is treated as empty and explicit delete removes one result", async () => {
+test("corrupt storage remains untouched and blocks reads, writes, and deletes", async () => {
   const directory = await temporaryDirectory();
   try {
-    await writeFile(join(directory, "results.json"), "not-json", "utf8");
+    const file = join(directory, "results.json");
+    await writeFile(file, "not-json", "utf8");
     const storage = new CentralStorage(directory);
-    assert.equal(await storage.get("energy-profile"), undefined);
-    await storage.put("energy-profile", profile);
-    await storage.put("battery-report", battery);
-    await storage.remove("energy-profile");
-    assert.equal(await storage.get("energy-profile"), undefined);
-    assert.deepEqual(await storage.get("battery-report"), battery);
+    await assert.rejects(storage.get("energy-profile"), StorageCorruptError);
+    await assert.rejects(storage.put("energy-profile", profile), StorageCorruptError);
+    await assert.rejects(storage.remove("energy-profile"), StorageCorruptError);
+    assert.equal(await readFile(file, "utf8"), "not-json");
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
 

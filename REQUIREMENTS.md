@@ -22,7 +22,7 @@ Een zelfstandige, gebruiksvriendelijke energie-app voor Belgische huishoudens di
 - FR-006: toon alleen berekende adviezen wanneer voldoende echte data bestaat;
 - FR-007: werk als zelfstandige fullscreen webapp zonder Home Assistant-frontenddependency.
 - FR-008: toon de verbruiksgrafiek uitsluitend uit echte, getimede Home Assistant-history wanneer die bron beschikbaar is; een statische demo- of prijsserie mag niet als actuele of historische meting worden getoond.
-- FR-009: toon energieprijzen per geselecteerde Brusselse kalenderdag uitsluitend uit echte Home Assistant-data, omgerekend van EUR/kWh naar ct/kWh; ontbrekende historie of niet-gepubliceerde morgenprijzen blijven zichtbaar leeg.
+- FR-009 (aangepast op expliciete gebruikersopdracht 24 september 2026): toon Belgische day-ahead spotprijzen voor gisteren, vandaag en morgen uit een echte openbare prijsbron, onafhankelijk van Home Assistant. Reken EUR/MWh om naar ct/kWh en toon bron en licentie. Ontbrekende kwartieren en niet-gepubliceerde morgenprijzen blijven zichtbaar leeg. Home Assistant blijft uitsluitend bron voor gemeten vermogen.
 - FR-010: simuleer lokaal 0/3/5/7/10/13 kWh batterijcapaciteit op gecontroleerde kwartierdata en toon meetkwaliteit, aannames, eindlading en datagaten zichtbaar.
 - FR-011: toon financiële batterijresultaten alleen na expliciet bevestigde contract- en offertegegevens; presenteer ze als energiecomponentscenario, niet als volledige factuur, offerte of gegarandeerde ROI.
 - FR-012: een bewaard rapport blijft na refresh bereikbaar; schemawijzigingen hebben een geteste migratie of een zichtbare, niet-destructieve herstelstate.

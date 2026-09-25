@@ -14,6 +14,7 @@ import { loadBelpexArchive } from "./belpex-history.js";
 import { handleBelpexHistoryRequest } from "./belpex-history-route.js";
 import { CentralStorage } from "./central-storage.js";
 import { handleCentralStorageRequest } from "./central-storage-route.js";
+import { isHomeAssistantIngressPeer, stripHomeAssistantIngressPrefix } from "./ingress.js";
 
 const envPath = fileURLToPath(new URL("../.env", import.meta.url));
 const localEnv: Record<string, string> = {};
@@ -54,8 +55,6 @@ let latest: LiveMeterReading = source.name === "home-assistant" ? {
 let lastError: string | undefined;
 
 const headers = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "Content-Type",
   "Cache-Control": "no-store",
 };
 
@@ -65,7 +64,11 @@ const json = (response: ServerResponse, status: number, value: unknown) => {
 };
 
 const server = createServer((request, response) => {
-  const url = new URL(request.url ?? "/", `http://${request.headers.host}`);
+  if (setting("CREMS_REQUIRE_INGRESS_PEER") === "true" && !isHomeAssistantIngressPeer(request.socket.remoteAddress)) {
+    return json(response, 403, { error: "ingress_only" });
+  }
+  const url = stripHomeAssistantIngressPrefix(request.url ?? "/", request.headers.host);
+  request.url = `${url.pathname}${url.search}`;
   if (handleBridgeRoutePrelude(request, response, source)) return;
   if (handleHealthRequest(request, response, {
     source: source.name,

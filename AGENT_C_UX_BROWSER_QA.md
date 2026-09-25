@@ -14,3 +14,7 @@ Rapporteer per scenario:
 - maximaal drie privacyveilige screenshotpaden voor de hele taak.
 
 Controleer altijd navigatie, refresh, loading/leeg/fout, keyboardfocus, 375 px, minimaal 1280 px en de taakspecifieke opslag-/privacygrenzen. Een FAIL is een releaseblocker; Agent C wijzigt de code niet zelf.
+
+Voor HA Ingress test je de geneste URL (niet alleen `/` op de add-onpoort): document, CSS/JS, live SSE en ten minste één API-route moeten laden binnen dezelfde Ingress-prefix. Browserbewijs vervangt geen server-side peer- en CORS-tests.
+
+Een browsercheck wordt alleen uitgevoerd na een nieuwe expliciete gebruikersopdracht die browserbediening toestaat. Zonder die opdracht rapporteert Agent C `NOT RUN` met de reden; automatische tests of gedeelde screenshots worden niet als browser-PASS omgedoopt. Screenshots bevatten geen identifiers, CSV-inhoud, tokens of centrale opslagdata.

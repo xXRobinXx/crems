@@ -1,5 +1,5 @@
 name: CREMS Energie
-version: "0.1.8"
+version: "0.1.10"
 slug: crems_energy
 description: Lokale energie-inzichten met een read-only Home Assistant-koppeling
 url: https://github.com/xXRobinXx/crems
@@ -10,11 +10,8 @@ startup: application
 boot: auto
 init: false
 homeassistant_api: true
-ports:
-  8099/tcp: 8099
-ports_description:
-  8099/tcp: CREMS webinterface
-webui: http://[HOST]:[PORT:8099]
+ingress: true
+ingress_port: 8099
 panel_icon: mdi:home-lightning-bolt
 options:
   import_power_entity: ""

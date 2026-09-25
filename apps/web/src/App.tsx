@@ -7,7 +7,8 @@ import { usePowerHistory } from "./use-power-history";
 import { powerAxisTicks, scalePowerHistory } from "./power-chart";
 import { fullBrusselsDayWindow, selectBrusselsDayWindow, type DaySelection } from "./day-window";
 import { usePriceHistory } from "./use-price-history";
-import { scalePriceHistory } from "./price-chart";
+import { scalePriceHistory, spotPriceAt } from "./price-chart";
+import { brusselsChartTime, chartTimeTicks, type ChartWindow } from "./chart-time";
 import { loadLocalEnergyProfile, profileFromPreview, removeLocalEnergyProfile, saveLocalEnergyProfile, type LocalEnergyProfile } from "./local-energy-profile";
 import { createEnergyReport } from "./energy-report";
 import type { BatterySimulationResult } from "@crems/core/battery-simulation";
@@ -41,19 +42,24 @@ export function App() {
   const [csvProgress,setCsvProgress]=useState<{phase:"reading"|"finalizing"|"complete"|"cancelled";bytesRead:number;totalBytes:number}|null>(null);
   const [energyProfile, setEnergyProfile] = useState<LocalEnergyProfile | undefined>(() => {try{const storage=browserStorage();return storage?loadLocalEnergyProfile(storage):undefined;}catch{return undefined;}});
   const [profileMessage, setProfileMessage] = useState<string | undefined>();
+  const [centralStorageMessage, setCentralStorageMessage] = useState<string>();
   const centralResults = useMemo(() => createCentralResultsClient(), []);
   useEffect(() => {
     let active = true;
     void Promise.allSettled([centralResults.getEnergyProfileState(), centralResults.getBatteryReportState()]).then(([profileResult, reportResult]) => {
       if (!active) return;
+      let keptLocal = false;
+      let readFailed = false;
       if (profileResult.status === "fulfilled") {
         if (profileResult.value.status === "present") setEnergyProfile(profileResult.value.value);
-        else { const storage = browserStorage(); if (storage) removeLocalEnergyProfile(storage); setEnergyProfile(undefined); }
-      }
+        else keptLocal ||= Boolean(energyProfile);
+      } else readFailed = true;
       if (reportResult.status === "fulfilled") {
         if (reportResult.value.status === "present") setBatteryStorage({ status: "current", report: reportResult.value.value });
-        else { removeBatteryStorage(browserStorage()); setBatteryStorage({ status: "empty" }); setBatteryReplayInput(undefined); }
-      }
+        else keptLocal ||= batteryStorage.status !== "empty";
+      } else readFailed = true;
+      if (readFailed) setCentralStorageMessage("Centrale opslag is niet leesbaar. Eerder lokaal bewaarde gegevens blijven op deze browser staan.");
+      else if (keptLocal) setCentralStorageMessage("De centrale opslag is leeg. Eerder lokaal bewaarde gegevens blijven op deze browser staan.");
     });
     return () => { active = false; };
   }, [centralResults]);
@@ -65,8 +71,17 @@ export function App() {
   useEffect(() => { if (page !== "import") csvSelection.dispose(); }, [page, csvSelection]);
   const { reading, connected } = useLiveMeter();
   const history = usePowerHistory(connected && reading.source === "home-assistant", historyDay);
-  const priceHistory = usePriceHistory(connected && reading.source === "home-assistant", historyDay);
-  const currentPriceCents = reading.currentPriceEurKwh == null ? null : reading.currentPriceEurKwh * 100;
+  const priceEnabled = true;
+  const yesterdayPriceHistory = usePriceHistory(priceEnabled && historyDay === "yesterday", "yesterday");
+  const todayPriceHistory = usePriceHistory(priceEnabled, "today");
+  const tomorrowPriceHistory = usePriceHistory(priceEnabled, "tomorrow");
+  const priceHistory = historyDay === "yesterday" ? yesterdayPriceHistory : historyDay === "tomorrow" ? tomorrowPriceHistory : todayPriceHistory;
+  const now = Date.now();
+  const todayPrices = todayPriceHistory.status === "success" ? todayPriceHistory.data : undefined;
+  const currentPriceCents = todayPrices && spotPriceAt(todayPrices, now, now);
+  const nextHour = (Math.floor(now / 3_600_000) + 1) * 3_600_000;
+  const tomorrowPrices = tomorrowPriceHistory.status === "success" ? tomorrowPriceHistory.data : undefined;
+  const nextPriceCents = todayPrices && nextHour < Date.parse(todayPrices.end) ? spotPriceAt(todayPrices, nextHour, now) : tomorrowPrices && spotPriceAt(tomorrowPrices, nextHour, now);
   const updated = useMemo(
     () => new Date(reading.timestamp).toLocaleTimeString("nl-BE", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
     [reading.timestamp],
@@ -102,6 +117,7 @@ export function App() {
   const forgetBattery=(key?:string)=>{const storage=browserStorage();if(!removeBatteryStorage(storage,key)){setBatteryMessage("Verwijderen lukte niet; je rapport blijft bewaard en zichtbaar.");return;}setBatteryStorage(loadBatteryStorageState(storage));setBatteryInput(undefined);setBatteryReplayInput(undefined);setBatteryMessage("Batterijrapport verwijderd.");void centralResults.removeBatteryReport().catch(()=>setBatteryMessage("Lokaal verwijderd, maar verwijderen op de Raspberry Pi lukte niet."));};
 
   return <main className="shell">
+    {centralStorageMessage && <p className="chart-warning" role="status">{centralStorageMessage}</p>}
     <header>
       <button className="brand" onClick={() => setPage("overview")}><i>C</i><strong>CREMS</strong><span>Energie</span></button>
       <nav aria-label="Hoofdnavigatie">
@@ -111,20 +127,20 @@ export function App() {
         <span className="nav-step"><button className={page === "battery" ? "active" : ""} aria-current={page === "battery" ? "page" : undefined} aria-disabled={!energyProfile && !batteryInput && batteryStorage.status === "empty"} aria-describedby={!energyProfile && !batteryInput && batteryStorage.status === "empty" ? "battery-requirement" : undefined} onClick={() => { if (energyProfile || batteryInput || batteryStorage.status !== "empty") setPage("battery"); }}>3. Batterij</button>{!energyProfile && !batteryInput && batteryStorage.status === "empty" && <small id="battery-requirement">Bewaar eerst je Energiepaspoort bij Data.</small>}</span>
         <span className="nav-step"><button className={page === "contract" ? "active" : ""} aria-current={page === "contract" ? "page" : undefined} aria-disabled={!energyProfile} aria-describedby={!energyProfile ? "contract-requirement" : undefined} onClick={() => { if (energyProfile) setPage("contract"); }}>4. Contract</button>{!energyProfile && <small id="contract-requirement">Bewaar je Energiepaspoort bij Data.</small>}</span>
       </nav>
-      <div className={`status ${connected && reading.source !== "simulator" ? "online" : ""}`}><i />{
-        !connected ? "Bridge offline" : reading.source === "simulator" ? "Simulatie · geen echte data" : "Home Assistant live"
+      <div className={`status ${connected && reading.source !== "simulator" && reading.quality === "measured" ? "online" : ""}`}><i />{
+        !connected ? "Bridge offline" : reading.source === "simulator" ? "Simulatie · geen echte data" : reading.quality === "incomplete" ? "Home Assistant · onvolledige meting" : "Home Assistant live"
       }</div>
     </header>
 
     {page==="import"&&(csvProgress?.phase==="reading"||csvProgress?.phase==="finalizing")&&<div className="import-progress" role="status" aria-live="polite"><span>{csvProgress.phase==="finalizing"?"Lokaal afronden…":`Lokaal verwerken… ${csvProgress.totalBytes?Math.min(99,Math.round(csvProgress.bytesRead/csvProgress.totalBytes*100)):0}%`}</span><button type="button" onClick={()=>csvSelection.cancel()}>Annuleren</button></div>}
 
     {page === "overview" && <>
-      <section className="hero"><div><p className="eyebrow">Slim energiebeheer</p><h1>Alles wat je woning<br />met energie doet.</h1></div><div className="now"><span>Spotprijs nu</span><strong>{currentPriceCents?.toLocaleString("nl-BE", { maximumFractionDigits: 1 }) ?? "—"}</strong><small>{currentPriceCents == null ? "nog niet gekoppeld" : "energieprijs in ct/kWh · Home Assistant"}</small></div></section>
+      <section className="hero"><div><p className="eyebrow">Slim energiebeheer</p><h1>Alles wat je woning<br />met energie doet.</h1></div><div className="now"><span>Spotprijs nu</span><strong>{currentPriceCents?.toLocaleString("nl-BE", { maximumFractionDigits: 1 }) ?? "—"}</strong><small>{currentPriceCents == null ? "geen gepubliceerde spotprijs" : "spotprijs in ct/kWh · Energy-Charts.info"}</small></div></section>
       <section className="metrics">
-        <article><span>{reading.source === "simulator" ? "Demo verbruik" : "Live verbruik"}</span><strong>{reading.importPowerW.toLocaleString("nl-BE")} W</strong><small>{reading.source === "simulator" ? "gesimuleerde testwaarde" : `bijgewerkt om ${updated}`}</small></article>
-        <article><span>{reading.source === "simulator" ? "Demo injectie" : "Live injectie"}</span><strong className="green">{reading.exportPowerW.toLocaleString("nl-BE")} W</strong><small>naar het net</small></article>
+        <article><span>{reading.source === "simulator" ? "Demo verbruik" : reading.quality === "incomplete" ? "Onvolledige afname" : "Live verbruik"}</span><strong>{reading.quality === "incomplete" && reading.importPowerW === 0 ? "—" : `${reading.importPowerW.toLocaleString("nl-BE")} W`}</strong><small>{reading.source === "simulator" ? "gesimuleerde testwaarde" : reading.quality === "incomplete" ? "sensor ontbreekt of is ongeldig" : `bijgewerkt om ${updated}`}</small></article>
+        <article><span>{reading.source === "simulator" ? "Demo injectie" : reading.quality === "incomplete" ? "Onvolledige injectie" : "Live injectie"}</span><strong className="green">{reading.quality === "incomplete" && reading.exportPowerW === 0 ? "—" : `${reading.exportPowerW.toLocaleString("nl-BE")} W`}</strong><small>{reading.quality === "incomplete" ? "sensor ontbreekt of is ongeldig" : "naar het net"}</small></article>
         <article><span>Lokale energieanalyse</span><strong>{energyProfile||batteryAnalysis ? "Lokaal klaar" : "Nog niet bewaard"}</strong><small>{energyProfile ? `profiel tot ${new Date(energyProfile.period.end).toLocaleDateString("nl-BE")}` : batteryAnalysis ? `batterijresultaat tot ${new Date(batteryAnalysis.quality.period.end).toLocaleDateString("nl-BE")}` : "controleer eerst je CSV"}</small></article>
-        <article><span>Spotprijs volgend uur</span><strong>{reading.nextPriceEurKwh == null ? "—" : `${(reading.nextPriceEurKwh * 100).toLocaleString("nl-BE", { maximumFractionDigits: 1 })} ct`}</strong><small>{reading.nextPriceEurKwh == null ? "nog niet gekoppeld" : "energieprijs via Home Assistant"}</small></article>
+        <article><span>Spotprijs volgend uur</span><strong>{nextPriceCents == null ? "—" : `${nextPriceCents.toLocaleString("nl-BE", { maximumFractionDigits: 1 })} ct`}</strong><small>{nextPriceCents == null ? "geen gepubliceerde spotprijs" : "spotprijs via Energy-Charts.info"}</small></article>
       </section>
       <section className="content-grid">
         <PowerHistoryPanel state={history} priceState={priceHistory} selection={historyDay} onSelection={setHistoryDay} />
@@ -230,59 +246,82 @@ function PowerHistoryPanel({ state, priceState, selection, onSelection }: { stat
   const displayWindow = fullBrusselsDayWindow(selection, new Date());
   const priceData = priceState.status === "success" ? priceState.data : undefined;
   const priceScale = priceData?.points.length ? scalePriceHistory(priceData, displayWindow) : undefined;
-  const head = <ChartHead label={selectedDay.label} dateLabel={selectedDay.dateLabel} showPrice={Boolean(priceScale)} />;
+  const head = <><ChartHead label={selectedDay.label} dateLabel={selectedDay.dateLabel} showPrice={Boolean(priceScale)} />{priceState.status === "success" && priceState.refreshError && <p className="chart-warning" role="status">De laatste prijsverversing lukte niet; de laatst geldige prijzen blijven zichtbaar.</p>}{priceState.status === "unavailable" && <p className="chart-warning" role="status">De prijsbron is niet bereikbaar.</p>}{priceState.status === "loading" && selection !== "tomorrow" && <p role="status">Energieprijzen worden geladen…</p>}{priceState.status === "error" && selection !== "tomorrow" && <p className="chart-warning" role="alert">De energieprijs kon niet worden geladen.</p>}{priceData?.quality === "notPublished" && selection !== "tomorrow" && <p role="status">De prijzen voor deze dag zijn nog niet gepubliceerd.</p>}</>;
   if (selection === "tomorrow") {
+    if (priceState.status === "unavailable") return <article className="panel chart-panel">{selector}{head}<p className="chart-state">Geen verbinding met de prijsbron.</p></article>;
     if (priceState.status === "loading") return <article className="panel chart-panel">{selector}{head}<p className="chart-state" role="status">De gepubliceerde energieprijzen voor morgen worden geladen…</p></article>;
     if (priceState.status === "error") return <article className="panel chart-panel">{selector}{head}<p className="chart-state error" role="alert">De energieprijzen voor morgen konden niet veilig worden opgehaald.</p></article>;
-    if (!priceData || priceData.quality === "notPublished" || !priceScale) return <article className="panel chart-panel">{selector}{head}<p className="chart-state future" aria-live="polite"><strong>De prijzen voor morgen zijn nog niet gepubliceerd.</strong><span>Vernieuw later deze pagina; er worden nooit verbruiks- of injectiewaarden voor de toekomst getoond.</span></p></article>;
-    return <article className="panel chart-panel">{selector}{head}<p className="price-note">Energie-/spotprijs in ct/kWh · exclusief nettarieven, heffingen en jouw contractkosten</p><p className="chart-warning" role="status">Vermogen wordt pas morgen gemeten.</p>{priceData.quality === "incomplete" && <p className="chart-warning" role="status">Gedeeltelijke prijsreeks: niet alle gepubliceerde uren zijn beschikbaar.</p>}<PriceOnlyChart data={priceData} scale={priceScale} label={`${selectedDay.label}, ${selectedDay.dateLabel}`} /></article>;
+    if (!priceData || priceData.quality === "notPublished" || !priceScale) return <article className="panel chart-panel">{selector}{head}<p className="chart-state future" aria-live="polite"><strong>De prijzen voor morgen zijn nog niet gepubliceerd.</strong><span>Zolang dit tabblad zichtbaar is, controleren we automatisch elke tien minuten op nieuwe prijzen.</span></p></article>;
+    return <article className="panel chart-panel">{selector}{head}<p className="price-note">Energie-/spotprijs in ct/kWh · exclusief nettarieven, heffingen en jouw contractkosten</p><p className="chart-warning" role="status">Vermogen wordt pas morgen gemeten.</p>{priceData.quality === "incomplete" && <p className="chart-warning" role="status">Gedeeltelijke prijsreeks: niet alle gepubliceerde uren zijn beschikbaar.</p>}<PriceOnlyChart displayWindow={displayWindow} data={priceData} scale={priceScale} label={`${selectedDay.label}, ${selectedDay.dateLabel}`} /></article>;
   }
   const powerMessage = state.status === "unavailable" ? "Verbruiksgeschiedenis is alleen beschikbaar wanneer Home Assistant verbonden is." : state.status === "loading" ? "De gekozen dag wordt geladen…" : state.status === "empty" ? "Vandaag zijn nog geen metingen beschikbaar." : state.status === "error" ? "De verbruiksgeschiedenis voor deze dag kon niet veilig worden opgehaald." : undefined;
-  if (powerMessage) return <article className="panel chart-panel">{selector}{head}{priceScale && priceData ? <><p className="price-note">Energie-/spotprijs in ct/kWh · exclusief nettarieven, heffingen en jouw contractkosten</p>{priceData.quality === "incomplete" && <p className="chart-warning" role="status">Gedeeltelijke prijsreeks: niet alle gepubliceerde uren zijn beschikbaar.</p>}<p className="chart-warning" role="status">{powerMessage}</p><PriceOnlyChart data={priceData} scale={priceScale} label={`${selectedDay.label}, ${selectedDay.dateLabel}`} /></> : <p className={`chart-state${state.status === "error" ? " error" : ""}`} role={state.status === "loading" ? "status" : undefined} aria-live="polite">{powerMessage}</p>}</article>;
+  if (powerMessage) return <article className="panel chart-panel">{selector}{head}{priceScale && priceData ? <><p className="price-note">Energie-/spotprijs in ct/kWh · exclusief nettarieven, heffingen en jouw contractkosten</p>{priceData.quality === "incomplete" && <p className="chart-warning" role="status">Gedeeltelijke prijsreeks: niet alle gepubliceerde uren zijn beschikbaar.</p>}<p className="chart-warning" role="status">{powerMessage}</p><PriceOnlyChart displayWindow={displayWindow} data={priceData} scale={priceScale} label={`${selectedDay.label}, ${selectedDay.dateLabel}`} /></> : <p className={`chart-state${state.status === "error" ? " error" : ""}`} role={state.status === "loading" ? "status" : undefined} aria-live="polite">{powerMessage}</p>}</article>;
   if (state.status === "future") return <article className="panel chart-panel">{selector}{head}<p className="chart-state future" aria-live="polite"><strong>Morgen is nog niet gemeten.</strong><span>De grafiek verschijnt zodra deze dag begonnen is en echte Home Assistant-metingen beschikbaar zijn.</span></p></article>;
   if (state.status !== "success") return <article className="panel chart-panel">{selector}{head}<p className="chart-state" aria-live="polite">De verbruiksgeschiedenis is tijdelijk niet beschikbaar.</p></article>;
   const { data } = state;
-  if (data.import.length === 0 && data.export.length === 0) return <article className="panel chart-panel">{selector}{head}<p className="chart-state" aria-live="polite">Home Assistant heeft voor deze dag geen meetpunten.</p></article>;
+  if (data.import.length === 0 && data.export.length === 0) return <article className="panel chart-panel">{selector}{head}<p className="chart-state" aria-live="polite">Home Assistant heeft voor deze dag geen meetpunten.</p>{priceScale && priceData && <PriceOnlyChart displayWindow={displayWindow} data={priceData} scale={priceScale} label={selectedDay.label + ", " + selectedDay.dateLabel} />}</article>;
   const scaled = scalePowerHistory(data, displayWindow);
   const powerTicks = powerAxisTicks(scaled);
-  const start = new Date(displayWindow.start).toLocaleString("nl-BE", { weekday: "short", hour: "2-digit", minute: "2-digit" });
-  const end = new Date(displayWindow.end).toLocaleString("nl-BE", { weekday: "short", hour: "2-digit", minute: "2-digit" });
   return <article className="panel chart-panel">{selector}{head}
     {state.refreshError && <p className="chart-warning" role="status">De laatste verversing lukte niet; de laatst geldige meting blijft zichtbaar.</p>}
     {data.quality === "incomplete" && <p className="chart-warning" role="status">Gedeeltelijke meting: één of beide meetreeksen is niet volledig beschikbaar.</p>}
-    {selection === "today" && <p className="chart-warning" role="status">Metingen tot {new Date(data.end).toLocaleTimeString("nl-BE", { hour: "2-digit", minute: "2-digit" })}; het resterende deel van vandaag blijft bewust leeg.</p>}
-    {priceState.status === "error" && <p className="chart-warning" role="status">De energieprijs kon niet worden geladen; de vermogensgrafiek blijft beschikbaar.</p>}
-    {priceState.status === "success" && priceState.refreshError && <p className="chart-warning" role="status">De laatste prijsverversing lukte niet; de laatst geldige prijzen blijven zichtbaar.</p>}
+    {selection === "today" && <p className="chart-warning" role="status">Metingen tot {brusselsChartTime(data.end, true)}; het resterende deel van vandaag blijft bewust leeg.</p>}
     {priceData?.quality === "incomplete" && <p className="chart-warning" role="status">Gedeeltelijke prijsreeks: niet alle gepubliceerde uren zijn beschikbaar.</p>}
     {priceScale && <p className="price-note">Energie-/spotprijs in ct/kWh · exclusief nettarieven, heffingen en jouw contractkosten</p>}
-    <svg viewBox="-76 0 1022 240" role="img" aria-label={`Werkelijk verbruik en injectie met linkeras in watt${priceScale ? " en energieprijs met rechteras in ct per kWh" : ""} uit Home Assistant voor ${selectedDay.label.toLowerCase()}, ${selectedDay.dateLabel}`}>
+    {priceScale && <PriceExtremes scale={priceScale}/>}
+    <svg viewBox="-76 0 1022 240" role="img" aria-label={`Werkelijk verbruik en injectie uit Home Assistant met linkeras in watt${priceScale ? " en spotprijs van Energy-Charts.info met rechteras in ct per kWh" : ""} voor ${selectedDay.label.toLowerCase()}, ${selectedDay.dateLabel}`}>
       {[20,67.5,115,162.5,210].map(y => <line key={y} x1="0" y1={y} x2="870" y2={y} stroke="#1d3349" />)}
       {powerTicks.map(({ y, valueW, label }) => <text key={`power-axis-${y}`} x="-8" y={y + 4} textAnchor="end" fill={valueW > 0 ? "#4ba3ff" : valueW < 0 ? "#33d6a6" : "#8fa7bd"} fontSize="11">{label}</text>)}
       <line x1="0" y1={scaled.zeroY} x2="870" y2={scaled.zeroY} stroke="#6b8297" strokeDasharray="5 7" />
-      {priceScale && <line x1="0" y1={priceScale.zeroY} x2="870" y2={priceScale.zeroY} stroke="#8b6d35" strokeDasharray="4 7" />}
       {scaled.importPaths.map((path, index) => <path key={`import-${index}`} d={path} fill="none" stroke="#4ba3ff" strokeWidth="3" vectorEffect="non-scaling-stroke" />)}
       {scaled.exportPaths.map((path, index) => <path key={`export-${index}`} d={path} fill="none" stroke="#33d6a6" strokeWidth="3" vectorEffect="non-scaling-stroke" />)}
-      {priceScale?.path && <path d={priceScale.path} fill="none" stroke="#ffb84d" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />}
-      {priceScale && <PriceAxis scale={priceScale} />}
-      <text x="0" y="235" fill="#8fa7bd">{start}</text><text x="870" y="235" textAnchor="end" fill="#8fa7bd">{end}</text>
-    </svg>
+      {priceScale && <>
+        <line x1="0" y1={priceScale.zeroY} x2="870" y2={priceScale.zeroY} stroke="#8b6d35" strokeDasharray="4 7" />
+        <path d={priceScale.path} fill="none" stroke="#ffb84d" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
+        {priceScale.points.map((point,index) => <circle key={index} cx={point.x} cy={point.y} r="2.5" fill="#ffb84d"/>)}
+        <PriceAxis scale={priceScale} right/>
+      </>}
+    </svg><ChartTimes window={displayWindow}/>
+    <details className="chart-values"><summary>Bekijk gemeten vermogenswaarden</summary>{(["import", "export"] as const).map(direction => <div key={direction}><h4>{direction === "import" ? "Afname" : "Injectie"}</h4><dl>{data[direction].map(point => <div key={point.timestamp}><dt>{brusselsChartTime(point.timestamp, true)}</dt><dd>{point.powerW.toLocaleString("nl-BE", {maximumFractionDigits: 1})} W</dd></div>)}</dl>{!data[direction].length && <p>Geen meetpunten.</p>}</div>)}</details>
+    {priceScale && priceData && <PriceValues data={priceData} scale={priceScale}/>}
   </article>;
 }
 
-function PriceOnlyChart({ data, scale, label }: { data: import("./price-history").PriceHistoryData; scale: ReturnType<typeof scalePriceHistory>; label: string }) {
-  const start = new Date(data.start).toLocaleString("nl-BE", { weekday: "short", hour: "2-digit", minute: "2-digit" });
-  const end = new Date(data.end).toLocaleString("nl-BE", { weekday: "short", hour: "2-digit", minute: "2-digit" });
-  return <svg viewBox="0 0 940 240" role="img" aria-label={`Gepubliceerde energieprijzen voor ${label}`}>
-    <line x1="0" y1={scale.zeroY} x2="870" y2={scale.zeroY} stroke="#8b6d35" strokeDasharray="4 7" />
-    <path d={scale.path} fill="none" stroke="#ffb84d" strokeWidth="3" vectorEffect="non-scaling-stroke" />
-    <PriceAxis scale={scale} />
-    <text x="0" y="235" fill="#8fa7bd">{start}</text><text x="870" y="235" textAnchor="end" fill="#8fa7bd">{end}</text>
-  </svg>;
+function ChartTimes({ window }: { window: ChartWindow }) {
+  return <div className="chart-times" aria-label="Tijd in Europe/Brussels">{chartTimeTicks(window).map(tick => <time key={tick.timestamp} dateTime={tick.timestamp} style={{left: `${tick.fraction * 100}%`, transform: tick.fraction === 0 ? "none" : tick.fraction === 1 ? "translateX(-100%)" : "translateX(-50%)"}}>{tick.label}</time>)}</div>;
 }
 
-function PriceAxis({ scale }: { scale: ReturnType<typeof scalePriceHistory> }) {
+function PriceOnlyChart({ data, scale, label, displayWindow }: { data: import("./price-history").PriceHistoryData; scale: ReturnType<typeof scalePriceHistory>; label: string; displayWindow: ChartWindow }) {
+  return <section className="overview-price"><h3>Energieprijs · ct/kWh</h3>
+    <PriceExtremes scale={scale}/>
+    <svg viewBox="-76 0 1022 240" role="img" aria-label={`Gepubliceerde Belgische spotprijzen van Energy-Charts.info voor ${label}`}>
+    <line x1="0" y1={scale.zeroY} x2="870" y2={scale.zeroY} stroke="#8b6d35" strokeDasharray="4 7" />
+    <path d={scale.path} fill="none" stroke="#ffb84d" strokeWidth="3" vectorEffect="non-scaling-stroke" />
+    {scale.points.map((point,index) => <circle key={data.points[index]!.timestamp} cx={point.x} cy={point.y} r="3" fill="#ffb84d"/>)}
+    <PriceAxis scale={scale} right/>
+  </svg><ChartTimes window={displayWindow}/>
+  <PriceValues data={data} scale={scale}/>
+  </section>;
+}
+
+function PriceExtremes({scale}: {scale: ReturnType<typeof scalePriceHistory>}) {
+  const format = (value: number) => value.toLocaleString("nl-BE", {maximumFractionDigits: 2});
+  return <div className="price-extremes"><span>Laagste gepubliceerde prijs <strong>{format(scale.lowest!)} ct/kWh</strong></span><span>Hoogste gepubliceerde prijs <strong>{format(scale.highest!)} ct/kWh</strong></span></div>;
+}
+
+function PriceValues({data,scale}: {data: import("./price-history").PriceHistoryData; scale: ReturnType<typeof scalePriceHistory>}) {
+  const format = (value: number) => value.toLocaleString("nl-BE", {maximumFractionDigits: 2});
+  return <>
+  <p className="price-note">Belgische day-ahead spotprijzen van <a href="https://energy-charts.info" target="_blank" rel="noreferrer">Energy-Charts.info</a> · data van Bundesnetzagentur | SMARD.de (CC BY 4.0). Tijd in Brussel; elk gepubliceerd kwartier heeft een eigen prijs. Ontbrekende kwartieren blijven leeg.</p>
+  {data.day !== "yesterday" && <p className="price-note">Zolang dit tabblad zichtbaar is, controleren we automatisch elke tien minuten op nieuwe prijzen.</p>}
+  <details className="chart-values"><summary>Bekijk alle {data.points.length} gepubliceerde prijswaarden</summary><dl>{scale.intervals.map(point => <div key={point.timestamp}><dt>{brusselsChartTime(point.timestamp, true)}{point.inferred ? " – " + brusselsChartTime(point.end, true) + " (einde afgeleid)" : point.end !== point.timestamp ? " – " + brusselsChartTime(point.end, true) + " (marktinterval)" : " (duur onbekend)"}</dt><dd>{format(point.priceCtKwh)} ct/kWh</dd></div>)}</dl></details>
+  </>;
+}
+
+function PriceAxis({ scale, right = false }: { scale: ReturnType<typeof scalePriceHistory>; right?: boolean }) {
   const values = [scale.max, (scale.max + scale.min) / 2, scale.min];
-  return <><line x1="874" y1="20" x2="874" y2="210" stroke="#8b6d35" />{values.map((value, index) => <g key={`price-axis-${index}`}><line x1="870" y1={20 + index * 95} x2="878" y2={20 + index * 95} stroke="#ffb84d" /><text x="884" y={24 + index * 95} textAnchor="start" fill="#ffb84d" fontSize="11">{value.toLocaleString("nl-BE", { maximumFractionDigits: 1 })} ct/kWh</text></g>)}</>;
+  const x = right ? 870 : 0;
+  return <><text x={right ? 878 : -8} y="12" textAnchor={right ? "start" : "end"} fill="#ffb84d" fontSize="11">ct/kWh</text><line x1={x} y1="20" x2={x} y2="210" stroke="#8b6d35" />{values.map((value, index) => <g key={`price-axis-${index}`}><line x1={x} y1={20 + index * 95} x2={x + (right ? 4 : -4)} y2={20 + index * 95} stroke="#ffb84d" /><text x={x + (right ? 8 : -8)} y={24 + index * 95} textAnchor={right ? "start" : "end"} fill="#ffb84d" fontSize="11">{value.toLocaleString("nl-BE", { maximumFractionDigits: 1 })}</text></g>)}</>;
 }
 
 const DAYS: DaySelection[] = ["yesterday", "today", "tomorrow"];
@@ -294,4 +333,4 @@ function DaySelector({ selection, onSelection }: { selection: DaySelection; onSe
   })}</div>;
 }
 
-const ChartHead = ({ label, dateLabel, showPrice }: { label: string; dateLabel: string; showPrice: boolean }) => <div className="panel-head"><div><span>Home Assistant · {label} · {dateLabel}</span><h2>{label === "Morgen" ? "Gepubliceerde energieprijs" : "Werkelijk vermogen en energieprijs"}</h2></div><div className="legend">{label !== "Morgen" && <><b className="blue" />Verbruik <b className="green-dot" />Injectie</>}{showPrice && <><b className="amber" />Energieprijs</>}</div></div>;
+const ChartHead = ({ label, dateLabel, showPrice }: { label: string; dateLabel: string; showPrice: boolean }) => <div className="panel-head"><div><span>{label === "Morgen" ? "Energy-Charts.info" : "Home Assistant vermogen · Energy-Charts.info prijs"} · {label} · {dateLabel}</span><h2>{label === "Morgen" ? "Gepubliceerde spotprijs" : "Werkelijk vermogen en spotprijs"}</h2></div><div className="legend">{label !== "Morgen" && <><b className="blue" />Verbruik <b className="green-dot" />Injectie</>}{showPrice && <><b className="amber" />Spotprijs</>}</div></div>;

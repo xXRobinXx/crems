@@ -98,8 +98,8 @@ test("serveert health lokaal alleen via GET met de bestaande veilige headers", a
     assert.equal(getResponse.status, 200);
     assert.equal(getResponse.headers.get("content-type"), "application/json");
     assert.equal(getResponse.headers.get("cache-control"), "no-store");
-    assert.equal(getResponse.headers.get("access-control-allow-origin"), "*");
-    assert.equal(getResponse.headers.get("access-control-allow-headers"), "Content-Type");
+    assert.equal(getResponse.headers.get("access-control-allow-origin"), null);
+    assert.equal(getResponse.headers.get("access-control-allow-headers"), null);
     assert.deepEqual(await getResponse.json(), {
       status: "degraded",
       source: "home-assistant",

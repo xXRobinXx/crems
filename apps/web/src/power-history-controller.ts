@@ -65,5 +65,6 @@ export const createPowerHistoryController = (
     }
   };
 
-  return { update, dispose: clear };
+  const dispose = () => { clear(); lastKey = ""; lastData = undefined; };
+  return { update, dispose };
 };

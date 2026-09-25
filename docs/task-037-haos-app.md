@@ -1,6 +1,6 @@
 # Task 037 — CREMS als Home Assistant-app
 
-Status: ARM64 IMAGE VALIDATED LOCALLY — publicatie en installatie op Home Assistant OS nog open.
+Status: ARM64 IMAGE HISTORISCH LOKAAL GEVALIDEERD — publicatie en installatie op Home Assistant OS nog open. Directe poortpublicatie is vervangen door Home Assistant Ingress.
 
 ## Doel
 
@@ -26,13 +26,13 @@ CREMS moet als zelfstandige Home Assistant-app op Home Assistant OS kunnen draai
 - App-image bouwt reproduceerbaar voor `rpi4-64`.
 - Website en bridge starten automatisch en herstellen na Home Assistant-herstart.
 - Bridge gebruikt de bestaande Home Assistant API-configuratie zonder token in de frontend.
-- De webinterface is lokaal bereikbaar via een Home Assistant-app-poort.
+- De webinterface is uitsluitend via geauthenticeerde Home Assistant Ingress bereikbaar; er wordt geen add-onpoort op het LAN gepubliceerd.
 - Stoppen, opnieuw starten en foutstatus tonen een duidelijke status zonder opgeslagen rapporten te wissen.
 - Installatie- en rollbackstappen zijn gedocumenteerd.
 - Build, typecheck en relevante tests slagen; Raspberry Pi-installatie wordt apart als gebruikerscheck vastgelegd.
 
 ## Volgende implementatiestap
 
-De appmetadata, Dockerfile en startscript staan onder `apps/home-assistant-addon`. De gecombineerde runtime serveert web en API op poort 8099 en gebruikt in Home Assistant OS de interne Supervisor-API en Supervisor-token. Lokale validatie: bridge 68/68 tests, webproductiebundel geslaagd en HTTP 200 voor `/` en `/api/current` op de gecombineerde server.
+De appmetadata, Dockerfile en startscript staan onder `apps/home-assistant-addon`. De gecombineerde runtime serveert web en API intern op poort 8099 en gebruikt in Home Assistant OS de interne Supervisor-API en Supervisor-token. De app wordt alleen via Home Assistant Ingress aangeboden; de webapp en opslag-API zijn niet als directe LAN-poort gepubliceerd.
 
-Het ARM64-image `crems-energy:0.1.0` is lokaal gebouwd en onder ARM64-emulatie gestart. `/`, `/api/current` en `/api/health` antwoorden met HTTP 200. De eerste containercontrole vond dat het BELPEX-prijsarchief ontbrak; de Dockerfile kopieert dit nu mee en de hercontrole slaagde. De GitHub Actions-workflow publiceert versies naar GHCR. Voor installatie resteert het aanmaken van de publieke GitHub-repository, pushen van de bron en toevoegen van die repository in Home Assistant. De bestaande browsergate van Task 036 blijft afzonderlijk open.
+Historische validatie bouwde image `crems-energy:0.1.0` onder ARM64-emulatie; dit bewijst geen huidige release. De GitHub-repository bestaat en beide addonmanifesten zijn nu op 0.1.9 gezet. De workflow valideert bij tag `v0.1.9` de manifestversies en publiceert pas na een expliciete tagpush naar GHCR. Resterend: geautoriseerde publicatie van de huidige bron, image pull/installatie op HAOS, configuratie, herstart/rollback en browser-PASS op de Pi. Geen actuele hardwaretest is uitgevoerd.

@@ -5,9 +5,7 @@ import {
   type HistoryLoader,
 } from "./power-history-route.js";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "Content-Type",
+const responseHeaders = {
   "Cache-Control": "no-store",
 };
 
@@ -19,7 +17,7 @@ export const handleBridgeRoutePrelude = (
 ): boolean => {
   if (handlePowerHistoryRequest(request, response, source, historyLoader)) return true;
   if (request.method === "OPTIONS") {
-    response.writeHead(204, corsHeaders);
+    response.writeHead(204, responseHeaders);
     response.end();
     return true;
   }

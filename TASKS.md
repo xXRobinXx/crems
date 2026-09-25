@@ -2,6 +2,130 @@
 
 ## Current Task
 
+Geen actieve implementatietaak. De code-auditcorrecties uit Task 054 zijn afgerond; externe deployment-, browser- en contract-API-gates staan hieronder apart geblokkeerd/open.
+
+### Task 054 — Onafhankelijke audit-follow-up: Ingress-runtime en statusweergave — 25 september 2026
+
+**Status:** CODE FIXES COMPLETE — automatische checks PASS; release blijft open tot actuele Agent C-browsercontrole en externe Pi-gates.
+
+Root is enige productiecode- en testschrijver. De Astra-agent was wegens zijn usage-limiet niet beschikbaar; read-only review en vervolgcontrole kwamen van `/root/pi_api_audit` (exact onderliggend model wordt niet door de agentruntime getoond). Write set: `apps/bridge/src/ingress.ts`, `apps/bridge/src/server.ts`, `apps/bridge/src/{central-storage-route,bridge-route-prelude,health,power-history-route,price-history-route,belpex-history-route}.ts`, `apps/bridge/test/ingress.test.ts`, `apps/bridge/test/{production-start,health,power-history-route}.test.ts`, `apps/home-assistant-addon/crems/Dockerfile`, `apps/web/scripts/build.mjs`, `apps/web/src/{App,belpex-history,central-results-client,power-history,price-history,use-live-meter}.ts*`, `apps/web/test/{battery-flow-structure,central-results-client}.test.ts`, beide addonmanifesten en auditdocumentatie.
+
+Ingress gebruikt relatieve assets en API/SSE-paden; bridge normaliseert het geneste Home Assistant Ingress-pad en weigert, in de addoncontainer, peers behalve `172.30.32.2`. Bridge-endpoints verlenen geen wildcard CORS. Incomplete meterdata wordt zichtbaar onvolledig zonder ontbrekende nullen als metingen te tonen; gecombineerde centrale fout/lege responses behouden de foutmelding. Addonversie is 0.1.10.
+
+Acceptatie: regressies voor Ingress-assets/API-prefix en Supervisor-peer, nul CORS-toegang, incomplete-meter UI, error-over-empty, add-onversies en bestaande volledige suites; actuele Pi/browsergedraging blijft apart bewijs.
+
+### Task 045 — Correcte kwaliteitslabels voor meterbronnen — 25 september 2026
+
+**Status:** APPROVED — rootreview en 84/84 bridge-tests/typecheck geslaagd.
+
+Doel: voldoe aan de bestaande data-semantiek voor live afname/injectie. Write set: `apps/bridge/src/meter-source.ts`, `apps/bridge/test/meter-source.test.ts`, `TASKS.md`, `REVIEW.md`. Beide vermogenskanalen moeten als geldige W/kW-states aanwezig zijn voordat de reading `measured` heet; een ontbrekend/ongeldig kanaal blijft zichtbaar als `incomplete`, niet als gemeten nul. De simulator blijft `estimated`. Behoud read-only HA-verzoeken en prijssemantiek. Tests bewijzen echte nul, ontbrekend/unknown kanaal en simulator; geen nieuw framework/dependency. Gerichte bridge-suite en typecheck valideren de taak. Daarna aparte review en volgende P1-taak.
+
+### Task 046 — Centrale opslag faalt veilig bij corrupte data
+
+**Status:** APPROVED — 84/84 bridge-tests, typecheck en code-review geslaagd.
+
+Write set: `apps/bridge/src/central-storage.ts`, `apps/bridge/src/central-storage-route.ts`, `apps/bridge/test/central-storage.test.ts`, `TASKS.md`, `REVIEW.md`. Een ontbrekend bestand is leeg; corrupt, te groot, onbekend schema of ongeldige opgeslagen inhoud blijft intact en wordt als herstelbare fout gemeld. GET mag geen nep-lege uitkomst geven; PUT/DELETE mogen de onbekende store niet herschrijven. Fouten blijven privacyveilig. Tests controleren bytes vóór/na GET/PUT/DELETE en tonen dat geldige stores hun bestaande gedrag behouden. Geen automatische backup/delete/migratie.
+
+### Task 047 — Lokale rapporten uitsluiten van het Raspberry Pi-image
+
+**Status:** APPROVED — 85/85 bridge-tests en imagecontext-regressie geslaagd.
+
+Write set: `.gitignore`, `.dockerignore`, `apps/home-assistant-addon/crems/Dockerfile`, `apps/bridge/test/production-start.test.ts`, `TASKS.md`, `REVIEW.md`. Runtime-resultaten, `.env`-bestanden, `.git`, dependencies en lokale builduitvoer mogen nooit in imagecontext of image-layers belanden. Dockerfile neemt alleen de benodigde openbare BELPEX-archiefdata over. Regressietest controleert exclusion en selectieve copy zonder runtime-inhoud te lezen. Geen image publiceren in deze taak.
+
+### Task 048 — Raspberry Pi-app alleen via Home Assistant Ingress aanbieden
+
+**Status:** APPROVED — 86/86 bridge-tests en addonmanifesttest geslaagd.
+
+Write set: `crems/config.yaml`, `apps/home-assistant-addon/crems/config.yaml`, `apps/bridge/test/production-start.test.ts`, `docs/task-037-haos-app.md`, `TASKS.md`, `REVIEW.md`. Verwijder direct gepubliceerde add-onpoort en bied de UI uitsluitend aan via Home Assistant Ingress op interne poort 8099. Zo blijft de centrale GET/PUT/DELETE-opslag achter de geauthenticeerde Home Assistant-ingang. Beide manifesten moeten dezelfde Ingress-configuratie hebben; bestaande lokale devproxy blijft bruikbaar. Geen publieke poort of internetpublicatie.
+
+### Task 049 — Centrale financiële snapshots strikt valideren
+
+**Status:** APPROVED — 86/86 bridge-tests, typecheck en code-review geslaagd.
+
+Write set: `apps/bridge/src/central-storage.ts`, `apps/bridge/test/central-storage.test.ts`, `TASKS.md`, `REVIEW.md`. De opslagvalidatie moet `effectiveStart <= quality.period.start`, `effectiveEnd >= quality.period.end` afdwingen en `investmentsEur` exact de vijf capaciteitsvelden laten bevatten. Bestaande financiële rekenkundige verificatie en veilige allowlists behouden. Regressies bewijzen dat afwijkende periode en genest extra veld geweigerd worden; geldige fixture blijft accepteren. Bridge-tests/typecheck.
+
+### Task 050 — Eén versie voor de HAOS-installer en ARM64-image
+
+**Status:** APPROVED — 87/87 bridge-tests, typecheck en release-configuratiereview geslaagd.
+
+Write set: `crems/config.yaml`, `apps/home-assistant-addon/crems/config.yaml`, `.github/workflows/home-assistant-image.yml`, `apps/bridge/test/production-start.test.ts`, `docs/task-037-haos-app.md`, `TASKS.md`, `REVIEW.md`. Synchroniseer beide addonmanifesten op één nieuwe versie; tagpush `v<versie>` bouwt ARM64 met exact die versie, workflowdispatch vraagt die versie expliciet en valideert manifesten vóór publicatie. Verwijder de hardcoded oude imagetag. Behoud `latest` alleen naast de versie-tag. Geen image push tijdens deze taak.
+
+### Task 051 — Browserkopieën behouden bij lege of onbereikbare centrale opslag
+
+**Status:** APPROVED — webtests 119/119 en integratiereview geslaagd.
+
+Write set: `apps/web/src/App.tsx`, `apps/web/test/battery-flow-structure.test.ts`, `TASKS.md`, `REVIEW.md`. Wanneer centrale GET leeg is of faalt, blijven geldige expliciet bewaarde browserresultaten staan. Een remote snapshot wordt alleen gebruikt wanneer die aanwezig en geldig is. Lege/failed reads triggeren nooit een write/delete en geven een veilige zichtbare status wanneer lokale data behouden blijft of centrale opslag onleesbaar is. Tests gebruiken component-hook host en fake fetch; bewijzen opslagbytes/states en foutmelding. Geen UI-browse benodigd voor statecontroller bewijs.
+
+### Task 052 — Raspberry Pi-installatie en herstartcontrole
+
+**Status:** BLOCKED — repo/image-publicatie en toegang tot Home Assistant OS ontbreken op deze werkplek.
+
+Doel: publiceer de actuele versie 0.1.10, installeer via HAOS custom app-repository en controleer Ingress. Acceptance: exacte ARM64 image digest/versie vastgelegd; HA-token komt alleen via Supervisor binnen; echte spotprijzen en bronstatus werken; lokale profielen blijven na add-on- en HA-herstart; rollback is uitvoerbaar; Agent C/browser PASS op 375 px en desktop. Gebruikers-Pi is externe staat en wordt niet als getest opgevoerd zonder verbinding.
+
+### Task 053 — Belgische contract-API toegang verkrijgen en aansluiten
+
+**Status:** TODO — bron/gebruikstoestemming ontbreekt.
+
+Eerst een officieel gedocumenteerde en toegestane contract-API vaststellen. V-test, BruSim en CompaCWaPE zijn officiële vergelijkers, maar er is geen publieke consumer-API of algemene hergebruiktoestemming aangetroffen; VREG's open-data licentie geldt alleen voor Cijfers, BruSim beschrijft supplier tariff-card submission. Implementatie start pas nadat de eigenaar/API toegang, schema en rechten schriftelijk of in officiële documentatie bevestigt. Geen scraping van verborgen interne endpoints als productiedata. Als officiële toegang ontbreekt, blijft handmatige tarieffiche-invoer de ondersteunde route.
+
+### Task 042 — Volledige audit en agentinstructies — 24 september 2026
+
+**Status:** AUDIT FOLLOW-UP DOCUMENTED — oorspronkelijke codebevindingen hersteld; productrelease CHANGES REQUIRED tot browser- en externe gates slagen.
+
+Expliciete gebruikersopdracht: volledige audit met Astra en instructies van alle agents actualiseren. Owner: Agent A (root), enige documentatieschrijver. Onafhankelijke read-only audit door de aangevraagde Astra-agent. Geen productie- of testwijzigingen en geen browserbediening.
+
+Write set: `AGENTS.md`, `AGENT_PLAYBOOK.md`, `AGENT_A_ARCHITECT_REVIEWER.md`, `AGENT_B_IMPLEMENTER.md`, `AGENT_C_UX_BROWSER_QA.md`, `PRODUCT_AUDIT.md`, `docs/full-audit-2026-09-24.md`, `TASKS.md`, `REVIEW.md`, `README.md`, uitsluitend verouderde risiconotities in `ARCHITECTURE.md`.
+
+Acceptance: huidige werkboom inclusief reeds aanwezige wijzigingen beoordelen; bevindingen met locatie, impact en reproduceerbaar bewijs; build, tests, typecheck en harness controleren; historische claims van actueel bewijs scheiden; alle vijf agentinstructies onderling consistent; open browsergates niet als PASS presenteren. Requirements en goedgekeurde ADR's blijven ongewijzigd. Herstel van gevonden productfouten vereist een afzonderlijke afgebakende taak.
+
+## Eerdere implementaties en open releasegates
+
+Onderstaande taakteksten behouden hun historische handoffs. Formuleringen zoals “actief” en “IN PROGRESS” binnen die historische teksten activeren geen tweede taak. Task 042 documenteert de afgeronde controle; er is nu geen implementatietaak actief. Task 035–041 en H001 behouden hun ontbrekende review- en browserbewijs.
+
+### Task 041 — Rechtstreekse Belgische spotprijzen — 24 september 2026
+
+READY FOR BROWSER REVIEW; expliciete gebruikersopdracht: haal de spotprijzen buiten Home Assistant op. Root is enige productieschrijver. Write set: `apps/bridge/src/direct-spot-price.ts`, `apps/bridge/src/price-history-route.ts`, `apps/bridge/src/price-history-service.ts` uitsluitend responstype, `apps/bridge/test/direct-spot-price.test.ts`, `apps/web/src/App.tsx`, `apps/web/src/price-history.ts`, `apps/web/test/price-history.test.ts`, `apps/web/test/overview-chart.test.ts`, `REQUIREMENTS.md`, `ARCHITECTURE.md`, `TASKS.md`, `REVIEW.md`. Bron: Energy-Charts v2, biedzone BE, day-ahead, EUR/MWh, CC BY 4.0 voor BE volgens werkelijk API-antwoord. Eén gecachete driedaagse API-opvraag per tien minuten, zodat de drie grafieken en prijskaarten dezelfde echte kwartieren gebruiken. Geen Home Assistant-afhankelijkheid voor prijzen; vermogen blijft via Home Assistant. Validatie van bronmetadata, tijdvensters, eenheden, DST, nul/negatief, gaten en ongepubliceerde morgenprijzen. Geen secrets/dependencies. Bridge 83/83 tests, web 115/115 tests en beide builds/typechecks geslaagd; extra webtest zonder HA PASS. Live API-replay en tijdelijke lokale API-route: gisteren/vandaag elk 96 kwartieren, morgen `notPublished`. Browser-PASS en afzonderlijke reviewstatus blijven open.
+
+**Lokale weergavecorrectie na melding van ontbrekende grafiek:** bij inspectie antwoordde `127.0.0.1:5173` met HTTP 200 maar de prijsproxy met 502 omdat de bridge niet op 8787 luisterde. De `tsx watch`-ontwikkelstart startte wel een proces maar opende de poort niet. Root is enige schrijver voor de uitbreiding van de write set met `apps/bridge/package.json`; `dev` start nu direct met `tsx src/server.ts`. Een frisse `pnpm dev` toont beide startmeldingen en de webproxy levert vandaag `measured` met 96 kwartieren. De lokale processen blijven draaien voor controle. Browser-PASS blijft open.
+
+**Screenshotcorrectie 24 september:** de door de gebruiker gedeelde browserafbeelding toont blijvend “laden…” voor morgen en geen prijs voor volgend uur, terwijl de lokale API vandaag 96 kwartieren levert. Root is enige schrijver voor de write-setuitbreiding `apps/web/src/price-history-controller.ts`, `apps/web/src/power-history-controller.ts`, `apps/web/test/price-history.test.ts` en `apps/web/test/power-history-controller.test.ts`. React StrictMode herhaalt effect-opstart: `dispose()` annuleerde het eerste verzoek maar behield de selectiesleutel, waardoor dezelfde dag niet opnieuw werd geladen. Beide controllers wissen de sleutel bij dispose; tests bewijzen abort gevolgd door een nieuwe succesvolle aanvraag. Web 118/118 tests en typecheck slagen; de live webbundel bevat de nieuwe reset en de prijsproxy levert 96 kwartieren. Geen browser-PASS na refresh; morgen blijft terecht `notPublished` tot publicatie.
+
+### Task 040 — Prijshistorie volgt statusduur — 22 september 2026
+
+**Aanvulling 24 september — drie volledige daggrafieken en één spotbron:** gebruiker verduidelijkt dat gisteren, vandaag en morgen elk alle beschikbare uren moeten tonen en telkens dezelfde spotdata moeten gebruiken. Root is enige schrijver voor deze correctie in `apps/bridge/src/price-history-service.ts`, `apps/bridge/test/price-history-service.test.ts`, `apps/web/src/price-chart.ts`, `apps/web/src/App.tsx`, `apps/web/test/price-history.test.ts` en de bijbehorende documentatie; eerdere onvoltooide wijzigingen blijven behouden. Bij ingestelde dagprijssensor: gisteren begrensde history daarvan, vandaag gepubliceerde `raw_today` of history van dezelfde sensor, morgen uitsluitend gepubliceerde `raw_tomorrow`. De prijskaarten gebruiken dezelfde vandaagreeks. Gepubliceerde toekomstige uren van vandaag worden volledig getekend; history stopt bij nu en ontbrekende bronuren blijven leeg. Gerichte regressies, typechecks en build vereist. Browsergate blijft open.
+
+**Update 23 september:** implementatie opgeleverd; Task 040 blijft actief als `READY FOR BROWSER REVIEW`. Buiten de beperkte sandbox slagen 76/76 bridgetests, 114/114 webtests, webbuild en typecheck. De lokale app en bridge zijn gestart; de echte prijs-API levert gisteren 22 punten met 22 eindtijden (drie intervallen van minstens twee uur), vandaag 11 punten met 11 eindtijden (één lang interval). Morgen is momenteel `notPublished`. De eerdere ENOMEM/esbuild-fouten waren omgevingsbeperkingen. Agent C probeerde browser-QA na expliciete gebruikersopdracht, maar de browserprovider bood geen iab/Chrome/Edge aan. Browser-PASS blijft open door toolbeschikbaarheid, niet door een vastgestelde app-FAIL.
+
+READY FOR BROWSER REVIEW als historisch werk; actieve prijsroute is vervangen door Task 041. Root heeft echte prijs-only history gecontroleerd: 22 statuswijzigingen, geen ongeldige states; twee- en drie-uursintervallen zonder wijziging werden ten onrechte afgekapt. HA history API documenteert statuswijzigingen (https://developers.home-assistant.io/docs/api/rest/). De bestaande implementatie en tests blijven beschikbaar, maar deze HA-prijsroute wordt niet meer aangeroepen. Browsergate van de eerdere zichtbare wijzigingen blijft open.
+
+### Task 039 — Prijspunten als leesbare traplijn — 22 september 2026
+
+Actuele status READY FOR BROWSER REVIEW: 14/14 prijs- en overzichttests, webbuild en webtypecheck groen. Agent C productiecodereview zonder bevindingen; testfixture gecorrigeerd met vaste klok en drie punten, assertions behouden. Root bevestigt echte API als traplijnen in alle drie dagkeuzes en nieuwe code via HTTP 200. Geen browser-PASS.
+
+Write-setaanvulling voor regressiecompatibiliteit: `apps/web/test/overview-chart.test.ts` mag de synthetische prijsfixture aanvullen tot drie punten om twee onderbouwende intervallen te bevatten; bestaande gecombineerde-grafiekassertions behouden.
+
+IN PROGRESS, enige actieve implementatie. Gebruiker verduidelijkt: grafiek toont slechts puntjes. Root inspecteerde echte API zonder persoonsgegevens: gisteren/vandaag bevatten sensorupdates rond het uur met secondenafwijkingen, eerste interval circa negen minuten; morgen 96 exacte kwartierpunten. Bestaande exacte globale cadencecheck weigert hierdoor alle historische intervallen. Agent B enige schrijver: `apps/web/src/price-chart.ts`, `apps/web/test/price-history.test.ts`, alleen indien nodig `apps/web/src/App.tsx`. Root docs: TASKS.md, REVIEW.md. Acceptance: aangrenzende bekende/afgeleide intervallen verbinden met verticale prijsstap; jitter en gedeeltelijk eerste interval blokkeren niet hele reeks; onbekende lange gaten blijven leeg; laatste interval blijft begrensd, één onbekend punt niet fictief verlengen; negatieve/nulprijzen, 23/25u en morgenkwartieren correct. Inferentie zichtbaar blijven onderscheiden van bronbevestigde duur. Gecombineerde grafiek behouden; geen opslag/bridgewijzigingen. Gerichte synthetische regressies, webtypecheck en build; browsergate open zonder expliciete browserbediening.
+
+### Task 038 — Morgenprijsbron behouden bij meterupdates — 22 september 2026
+
+Implementatie afgerond; READY FOR BROWSER REVIEW. Agent B: regressie eerst rood na drie meterupdates, daarna groen; 74/74 bridgetests, build en typecheck geslaagd. Agent C read-only review: geen resterende bevindingen. Root heeft de dataservice herstart en via de webproxy HTTP 200, 96 morgenprijzen en actieve gemeten meterupdates bevestigd. Geen browser-PASS; visuele releasegate blijft open.
+
+Status IN PROGRESS. Expliciete opdracht: herstel verloren morgenprijzen. Enige actieve implementatie; Task 037 behoudt open browsergate. Agent B is enige productieschrijver, root reviewt en documenteert. Write set: `apps/bridge/src/meter-source.ts`, `apps/bridge/test/price-history-service.test.ts`. Acceptance: herhaalde live reads behouden expliciet ingestelde morgenbron; raw_tomorrow blijft daarna via bestaande prijsservice opvraagbaar; nul/negatieve prijzen en bestaande foutafhandeling blijven correct. Geen bronwijziging, nieuwe dependencies of frontendwijzigingen. Gerichte regressie eerst rood dan groen, bridge tests/build/typecheck; na herstart echte API controleren zonder secrets te tonen. Docs root: TASKS.md, REVIEW.md.
+
+### Task 037 — Leesbaar overzicht en prijsgrafieken — 21 september 2026
+
+**Gebruikerscorrectie 22 september:** behoud de oorspronkelijke gecombineerde grafiek. De eerdere acceptance over aparte grafieken vervalt op expliciete opdracht: vermogen links en prijs rechts in één grafiek, gedeelde tijdas, behoud interval-/labelverbeteringen. Agent B is enige schrijver voor deze correctie binnen `App.tsx`, `styles.css` indien nodig en `test/overview-chart.test.ts`. Status READY FOR BROWSER REVIEW; tien gerichte tests en webtypecheck groen, gecombineerde grafiek aanwezig in geleverde bundel. Root heeft code gereviewd; browsergate blijft open. Geen overige herindeling.
+
+**Status:** READY FOR BROWSER REVIEW. Implementatie en gerichte grafiektests/typecheck geslaagd; browsergate blijft open. Expliciete gebruikersopdracht met screenshot van verbeterpunten. Deze taak is de enige actieve implementatie; eerdere taken behouden hun open reviewgates.
+
+Owner: Agent B, enige productieschrijver. Agent A (root) documenteert en reviewt; Agent C doet read-only QA zonder browserbediening.
+
+Write set: `apps/web/src/App.tsx`, `apps/web/src/price-chart.ts`, `apps/web/src/power-chart.ts`, `apps/web/src/chart-time.ts`, `apps/web/src/BatteryDailyReport.tsx`, `apps/web/src/styles.css`, `apps/web/test/price-history.test.ts`, `apps/web/test/power-history.test.ts`, `apps/web/test/overview-chart.test.ts`. Documentatie uitsluitend Agent A: `TASKS.md`, `docs/task-037-overview-check.md`, `REVIEW.md`.
+
+Acceptance: gepubliceerde prijsintervallen worden volledig getoond zonder ontbrekende perioden op te vullen; Brusselse tussentijdlabels en opvraagbare waarden; laagste/hoogste gepubliceerde prijs; vermogen en prijs apart met dezelfde tijdas; correcte tekst over automatische tienminutenverversing; batterijgrafieken passen mobiel zonder verplichte horizontale grafiekscroll en behouden afleesbare details. Loading/leeg/fout, nul/negatieve prijzen en DST blijven correct. Geen dependencies, opslag-, bron-API-, financiële of simulatorwijzigingen. Tests gebruiken uitsluitend synthetische data; geen browserbediening. Agent C legt checklist en bewijsbeperkingen vast; browser-PASS blijft vereist voor APPROVED.
+
+Validatie: relevante webtests en webtypecheck tijdens bouwen; bij eindgate eenmaal root `pnpm build`, `pnpm test`, `pnpm typecheck`.
+
 ### Task 036 — Begrijpelijke navigatievoorwaarden
 
 **Status:** READY FOR BROWSER REVIEW — implementatie en automatische validatie in deze verfijningsronde; bewijs in `.harness/checks.json` na geslaagde run. Browsergate en review blijven open.
@@ -296,6 +420,18 @@ Vervang de twee hardcoded demo-/prijs-polylines door een responsieve SVG die uit
 Voer uitsluitend Task 021 uit. Houd fetch/state en SVG-scaling in pure of geïnjecteerde helpers zodat Node-tests zonder DOM-framework volstaan. Gebruik geen `Date.now()` binnen de testbare controller: injecteer `now`. Verwijder de demo pas wanneer alle expliciete states renderen. Stop na rapportage per criterium voor onafhankelijke review door Agent A.
 
 ## Backlog
+
+### Task 043 — CREMS-website op Raspberry Pi laten draaien
+
+**Status:** TODO — uitvoeren na herstel van de open P1-bevindingen en vereiste releasegates.
+
+Doel: de gebouwde webapp en bridge duurzaam op de Raspberry Pi starten en vanaf het bedoelde thuisnetwerk bereikbaar maken. Eerst het bestaande HAOS-/Pi-platform en de netwerkgrens bevestigen; daarna installatie, herstart, logging, updates en lokale gegevensopslag ontwerpen en testen. Geheimen blijven buiten de webapp en repository. Acceptatie: pagina en API zijn na reboot bereikbaar op een vast adres, de meetbron en prijzen werken, en Agent C bewijst de volledige gebruikersreis op desktop en mobiel. Geen claim van vrijgave vóór securityreview en browser-PASS.
+
+### Task 044 — Belgische energiecontracten via een toegestane API ophalen
+
+**Status:** TODO — na Task 043; bron- en toegangsbeslissing vereist.
+
+Doel: een actuele, herleidbare bron vinden voor Belgische leveranciersproducten en contracttarieven per gewest. Onderzoek eerst officiële V-test, BruSim, CompaCWaPE en eventuele leveranciers-/partner-API's op documentatie, toegang, gebruiksrechten, actualiteit en velddekking. Implementeer pas na bevestigde toestemming en stabiele contractgegevens een server-side adapter. Vergelijk vaste, variabele en dynamische producten uitsluitend met passende tariefformules, periode, vaste kosten en injectievergoeding; markeer ontbrekende gegevens zichtbaar en toon bron plus peildatum. Geen scraping van ongedocumenteerde interne endpoints als productiebron en geen marktbrede besparingsclaim op basis van alleen spotprijzen.
 
 ### Task 009 — Echte Fluvius-fixture, kolommapping en kwartierintervalpreview
 

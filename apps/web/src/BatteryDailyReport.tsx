@@ -16,7 +16,7 @@ function IntervalChart({title,points,day,series,soc=false}:{title:string;points:
     {[0,.5,1].map(f=><g key={f}><line x1="48" x2="568" y1={y(max*f)} y2={y(max*f)} className="daily-grid"/><text x="42" y={y(max*f)+4} textAnchor="end">{number(max*f)}</text></g>)}
     {[0,.25,.5,.75,1].map(f=><text key={f} x={48+520*f} y="182" textAnchor={f===0?"start":f===1?"end":"middle"}>{time(new Date(start+(end-start)*f).toISOString())}</text>)}
     {points.map(p=><g key={p.start}>{series.map((s,i)=>soc?<path key={s.name} d={`M ${x(p.start)} ${y(p.startStoredKwh-p.resetLossKwh)} H ${x(p.end)} V ${y(s.value(p))}`} fill="none" stroke={s.color} strokeWidth="2"><title>{time(p.start)}: {number(s.value(p))} kWh{p.gap?" · gat vóór dit kwartier":""}</title></path>:<rect key={s.name} x={x(p.start)+(x(p.end)-x(p.start))*i/series.length} y={y(s.value(p))} width={Math.max(.2,(x(p.end)-x(p.start))/series.length-.4)} height={160-y(s.value(p))} fill={s.color} opacity={p.estimated?.55:.9}><title>{time(p.start)} · {s.name}: {number(s.value(p))} kWh{p.estimated?" · geschat":""}</title></rect>)}</g>)}
-  </svg></article>;
+  </svg><details className="chart-values"><summary>Bekijk waarden: {title}</summary><dl>{points.map(p=><div key={p.start}><dt>{time(p.start)} – {time(p.end)}{p.estimated ? " · geschat" : " · gemeten bron"}{p.gap ? " · gat ervoor" : ""}</dt><dd>{series.map(s=><span className="daily-detail-value" key={s.name}>{s.name}: {number(s.value(p))} kWh</span>)}</dd></div>)}</dl></details></article>;
 }
 
 export function BatteryDailyReport({days,initialDetail,source,onChooseSource,onReleaseInitialDetail}:{days:BatteryDay[]|undefined;initialDetail?:BatteryDayDetail;source?:BatteryRunInput;onChooseSource:()=>void;onReleaseInitialDetail?:()=>void}){

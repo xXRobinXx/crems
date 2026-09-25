@@ -23,8 +23,11 @@ Bij conflict: rapporteer het conflict en verander geen requirements stilzwijgend
 - Voeg dependencies alleen toe met aantoonbare noodzaak.
 - Commit nooit secrets, tokens, `.env`-bestanden of credentials.
 - Behandel simulatie-, geschatte en gemeten data zichtbaar verschillend.
+- Voor een Home Assistant-app met `ingress: true` zijn relatieve frontend-URL's en een server-side peercheck op exact `172.30.32.2` releasevereisten; alleen een manifest zonder gepubliceerde poort is geen Ingress-authenticatie. Geen wildcard CORS voor centrale opslag.
 - Tests en gedragsverificatie zijn onderdeel van iedere wijziging.
 - Claim niets als werkend zonder bewijs.
+- Een auditbevinding noemt bestand/onderdeel, impact en controleerbaar bewijs; ontbrekende dekking of onderbroken agentwerk wordt expliciet gemeld.
+- Historische taakstatussen en groene automatische tests gelden niet als releasegoedkeuring; zichtbaar gedrag vereist een actuele Agent C-browser-PASS.
 - Productiecode staat alleen in `apps/` en `packages/`; `archive/` en `research/` zijn geen build-input.
 
 ## Definition of Done

@@ -40,8 +40,6 @@ export const mapHealthResponse = (input: Readonly<HealthResponseInput>): HealthR
 };
 
 const healthHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "Content-Type",
   "Cache-Control": "no-store",
   "Content-Type": "application/json",
 };

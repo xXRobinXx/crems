@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { parsePriceHistoryResponse, type PriceHistoryData, type PriceHistoryState } from "../src/price-history.ts";
 import { createPriceHistoryController } from "../src/price-history-controller.ts";
-import { scalePriceHistory } from "../src/price-chart.ts";
+import { priceIntervals, scalePriceHistory, spotPriceAt } from "../src/price-chart.ts";
 
 const base: PriceHistoryData = { day: "today", start: "2026-08-28T00:00:00.000Z", end: "2026-08-29T00:00:00.000Z", quality: "measured", points: [
   { timestamp: "2026-08-28T01:00:00.000Z", priceCtKwh: 0 }, { timestamp: "2026-08-28T02:00:00.000Z", priceCtKwh: -5 }, { timestamp: "2026-08-28T03:00:00.000Z", priceCtKwh: 10 },
@@ -14,11 +14,14 @@ test("parser bewaart alleen allowlistvelden en geldige nul/negatieve prijzen", (
   assert.equal(parsePriceHistoryResponse({ ...base, day: "later" }), undefined);
   assert.equal(parsePriceHistoryResponse({ ...base, quality: "notPublished", points: base.points }), undefined);
   assert.deepEqual(parsePriceHistoryResponse({ ...base, quality: "notPublished", points: [] })?.points, []);
+  const direct = { ...base, source: "Energy-Charts.info · Bundesnetzagentur | SMARD.de", points: [{ timestamp: base.start, priceCtKwh: -0.5, end: "2026-08-28T00:15:00.000Z" }] };
+  assert.deepEqual(parsePriceHistoryResponse(direct), direct);
+  assert.equal(parsePriceHistoryResponse({ ...direct, source: "onbekende bron" }), undefined);
 });
 
-test("prijsschaal maakt hourly steps, behoudt negatieve nul en stopt op laatste x", () => {
+test("prijsschaal maakt begrensde uurintervallen en behoudt negatieve nul", () => {
   const chart = scalePriceHistory(base);
-  assert.match(chart.path, /^M36\.25,/); assert.match(chart.path, /L72\.50,[\d.]+ L72\.50,/); assert.match(chart.path, /L108\.75,[\d.]+$/);
+  assert.match(chart.path, /^M36\.25,/); assert.match(chart.path, /L72\.50,[\d.]+ L72\.50,/); assert.match(chart.path, /L145\.00,[\d.]+$/);
   assert.equal(chart.path.includes("870.00"), false); assert.equal(chart.min, -5); assert.equal(chart.max, 10);
   const empty = scalePriceHistory({ ...base, points: [] }); assert.equal(empty.path, ""); assert.equal(Number.isFinite(empty.zeroY), true);
 });
@@ -57,4 +60,79 @@ test("pauzeert verborgen polling en ververst onmiddellijk bij terugkeer", () => 
 test("gisteren blijft één fetch en een initieel verborgen tabblad wacht op zichtbaarheid", () => {
   const yesterday = setup(); yesterday.controller.update(true, "yesterday"); yesterday.controller.setVisibility(false); yesterday.controller.setVisibility(true); assert.equal(yesterday.calls.length, 1);
   const hidden = setup(); hidden.controller.setVisibility(false); hidden.controller.update(true, "today"); assert.equal(hidden.calls.length, 0); hidden.controller.setVisibility(true); assert.equal(hidden.calls.length, 1);
+});
+
+test("na effect-opruiming start dezelfde dag opnieuw, zoals bij React StrictMode", async () => {
+  const s = setup();
+  s.controller.update(true, "today");
+  const first = s.calls[0]!;
+  s.controller.dispose();
+  assert.equal(first.signal.aborted, true);
+  s.controller.update(true, "today");
+  assert.equal(s.calls.length, 2);
+  s.calls[1]!.resolve(base);
+  await flush();
+  assert.equal(s.states.at(-1)?.status, "success");
+});
+
+test("sensorjitter en kort eerste interval vormen een verbonden traplijn", () => {
+  const timestamps = ["2026-08-28T00:00:00.000Z", "2026-08-28T00:09:17.935Z", "2026-08-28T01:09:17.850Z", "2026-08-28T02:09:18.100Z"];
+  const data = {...base, day: "yesterday" as const, points: timestamps.map((timestamp,index)=>({timestamp,priceCtKwh:index-1}))};
+  const chart=scalePriceHistory(data);
+  assert.equal(chart.path.split("M").length-1,1);
+  assert.deepEqual(chart.intervals.slice(0,3).map(p=>p.end),timestamps.slice(1));
+  assert.equal(chart.intervals.at(-1)!.end,"2026-08-28T03:09:18.100Z");
+  assert.equal(chart.points.length,0);
+  assert.equal(chart.min,-1);assert.equal(chart.lowest,-1);
+});
+
+test("lange gaten blijven leeg, jittertolerantie is begrensd en één punt blijft een punt",()=>{
+  const data={...base,day:"yesterday" as const,points:[0,1,2,5].map(hour=>({timestamp:`2026-08-28T0${hour}:00:00.000Z`,priceCtKwh:hour}))};
+  const chart=scalePriceHistory(data);
+  assert.equal(chart.intervals[2]!.end,"2026-08-28T03:00:00.000Z");
+  assert.equal(chart.path.split("M").length-1,2);
+  const single=scalePriceHistory({...data,points:data.points.slice(0,1)});
+  assert.equal(single.path,"");assert.equal(single.points.length,1);assert.equal(single.intervals[0]!.inferred,false);
+  const irregular=scalePriceHistory({...data,points:[0,3610,7220].map(seconds=>({timestamp:new Date(Date.parse(base.start)+seconds*1000).toISOString(),priceCtKwh:0}))});
+  assert.equal(irregular.path,"");assert.equal(irregular.points.length,3);
+});
+
+test("vandaag stopt uiterlijk nu en laatste interval loopt maximaal één cadence",()=>{
+  const data={...base,points:[0,1,2].map(hour=>({timestamp:`2026-08-28T0${hour}:00:00.000Z`,priceCtKwh:0}))};
+  assert.equal(priceIntervals(data,Date.parse("2026-08-28T02:20:00Z")).at(-1)!.end,"2026-08-28T02:20:00.000Z");
+  assert.equal(priceIntervals(data,Date.parse("2026-08-28T10:00:00Z")).at(-1)!.end,"2026-08-28T03:00:00.000Z");
+});
+
+test("gepubliceerde prijzen van vandaag blijven zichtbaar tot lokale middernacht",()=>{
+  const start="2026-09-25T00:00:00.000Z",end="2026-09-26T00:00:00.000Z";
+  const data={...base,start,end,points:Array.from({length:24},(_,hour)=>({timestamp:new Date(Date.parse(start)+hour*3_600_000).toISOString(),priceCtKwh:hour-12}))};
+  const noon=Date.parse("2026-09-25T12:30:00.000Z");
+  const chart=scalePriceHistory(data,data,noon);
+  assert.equal(chart.intervals.at(-1)!.end,end);
+  assert.equal(chart.path.split("M").length-1,1);
+  assert.match(chart.path,/L870\.00,[\d.]+$/);
+  assert.equal(spotPriceAt(data,Date.parse("2026-09-25T12:30:00.000Z"),noon),0);
+  assert.equal(spotPriceAt(data,Date.parse("2026-09-25T13:00:00.000Z"),noon),1);
+  assert.equal(spotPriceAt(data,Date.parse(end),noon),undefined);
+});
+
+test("volledige morgenkwartieren en DST dagen vullen precies het gepubliceerde venster",()=>{
+  for(const hours of [23,24,25]){
+    const start=hours===23?"2026-03-28T23:00:00.000Z":"2026-10-24T22:00:00.000Z";
+    const end=new Date(Date.parse(start)+hours*3600000).toISOString();
+    const data={...base,day:"tomorrow" as const,start,end,points:Array.from({length:hours*4},(_,i)=>({timestamp:new Date(Date.parse(start)+i*900000).toISOString(),priceCtKwh:i%3-1}))};
+    const chart=scalePriceHistory(data,data,Date.parse(start)-86400000);
+    assert.equal(chart.intervals.at(-1)!.end,end);
+    assert.equal(chart.path.split("M").length-1,1);
+    assert.match(chart.path,/L870\.00,[\d.]+$/);
+    assert.equal(chart.points.length,0);assert.equal(chart.lowest,-1);assert.equal(chart.highest,1);
+  }
+});
+
+test("bron-eindtijden worden gevalideerd en historische duur wint van cadence",()=>{
+ const data={...base,day:"yesterday" as const,points:[{timestamp:"2026-08-28T00:00:00.000Z",priceCtKwh:0,end:"2026-08-28T03:00:00.000Z"},{timestamp:"2026-08-28T03:00:00.000Z",priceCtKwh:-1,end:"2026-08-28T04:00:00.000Z"},{timestamp:"2026-08-28T06:00:00.000Z",priceCtKwh:2,end:base.end}]};
+ assert.deepEqual(parsePriceHistoryResponse({...data,points:data.points.map(p=>({...p,raw:"discard"}))}),data);
+ const chart=scalePriceHistory(data);assert.equal(chart.path.split("M").length-1,2);assert.equal(chart.points.length,0);assert.ok(chart.intervals.every(p=>!p.inferred));assert.equal(chart.intervals[0]!.end,data.points[0]!.end);
+ for(const end of [null,"bad",data.points[0]!.timestamp,"2026-08-30T00:00:00Z","2026-08-28T04:00:00Z"])assert.equal(parsePriceHistoryResponse({...data,points:[{...data.points[0],end},...data.points.slice(1)]}),undefined);
+ assert.equal(parsePriceHistoryResponse({...data,points:[data.points[0],data.points[0]]}),undefined);
 });

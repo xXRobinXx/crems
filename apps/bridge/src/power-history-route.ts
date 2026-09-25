@@ -15,8 +15,6 @@ class InvalidHistoryQueryError extends Error {}
 class InvalidPublicHistoryWindowError extends Error {}
 
 const headers = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "Content-Type",
   "Cache-Control": "no-store",
   "Content-Type": "application/json",
 };

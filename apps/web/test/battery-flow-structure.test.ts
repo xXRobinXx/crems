@@ -32,7 +32,7 @@ const bundled=await build({entryPoints:[fileURLToPath(new URL("../src/App.tsx",i
   b.onResolve({filter:/^react(?:\/jsx-runtime)?$/},args=>({path:args.path,namespace:"hooks"}));
   b.onLoad({filter:/.*/,namespace:"hooks"},args=>({contents:args.path==="react"?'export const useState=(...a)=>globalThis.__batteryHooks.useState(...a); export const useRef=(...a)=>globalThis.__batteryHooks.useRef(...a); export const useMemo=(...a)=>globalThis.__batteryHooks.useMemo(...a); export const useEffect=(...a)=>globalThis.__batteryHooks.useEffect(...a);':'export const Fragment="fragment"; export const jsx=(type,props,key)=>({type,props,key}); export const jsxs=jsx;'}));
   b.onResolve({filter:/^\.\/use-(live-meter|power-history|price-history)$/},args=>({path:args.path,namespace:"live"}));
-  b.onLoad({filter:/.*/,namespace:"live"},()=>({contents:'export const useLiveMeter=()=>({connected:false,reading:{source:"simulator",timestamp:"2026-01-01T00:00:00Z",importPowerW:0,exportPowerW:0}}); export const usePowerHistory=()=>({}); export const usePriceHistory=()=>({});'}));
+  b.onLoad({filter:/.*/,namespace:"live"},()=>({contents:'export const useLiveMeter=()=>({connected:!!globalThis.__liveReading,reading:globalThis.__liveReading??{source:"simulator",timestamp:"2026-01-01T00:00:00Z",quality:"estimated",importPowerW:0,exportPowerW:0}}); export const usePowerHistory=()=>({}); export const usePriceHistory=()=>({});'}));
   b.onLoad({filter:/App\.tsx$/},()=>({contents:source+'\nexport {BatteryPlanner,ReleaseBatteryResult,BatteryDailyReport}; export {loadBatteryStorageState} from "./local-battery-analysis";',loader:"tsx"}));
   b.onLoad({filter:/battery-comparison\.ts$/},async args=>({contents:(await readFile(args.path,"utf8")).replace('  const reasons = batteryEligibility(quality);','  globalThis.__batteryComparisonCalls=(globalThis.__batteryComparisonCalls??0)+1;\n  const reasons = batteryEligibility(quality);'),loader:"ts"}));
 }}]});
@@ -103,6 +103,40 @@ test("App bewaart rapport, wist tijdelijke invoer en behoudt rapport bij verwijd
     planner.props.onSaved(saved);tree=h.render();planner=find(tree,n=>n.type===app.BatteryPlanner);assert.equal(planner.props.input,undefined);assert.deepEqual(planner.props.saved,saved);
     button(tree,"Overzicht").props.onClick();tree=h.render();button(tree,"3. Batterij").props.onClick();tree=h.render();assert.equal(find(tree,n=>n.type===app.BatteryPlanner).props.input,undefined);
   }finally{h.dispose();delete globals.window;}
+});
+
+test("lege of onbereikbare centrale opslag wist geen lokaal rapport en toont veilige status",async()=>{
+  const originalFetch=globalThis.fetch;
+  const profile={version:2,savedAt:"2026-09-10T00:00:00Z",period:quality.period,measuredImportKwh:100,estimatedImportKwh:0,measuredExportKwh:50,estimatedExportKwh:0,measuredCount:35040,estimatedCount:0,noConsumptionCount:0,integrityReliable:true,gapCount:0,duplicateCount:0,overlapCount:0};
+  for(const failure of [false,true]){
+    const s=storage();s.data.set("crems.local-energy-profile.v2",JSON.stringify(profile));globals.window={localStorage:s};let requests=0;
+    globalThis.fetch=async()=>{requests++;if(failure)throw Error("offline");return new Response(JSON.stringify({result:null}),{status:200,headers:{"Content-Type":"application/json"}});};
+    const h=host(app.App);
+    try{
+      let tree=h.render();h.flush();await waitFor(()=>requests===2);await waitFor(()=>{tree=h.render();return nodes(tree).some(n=>n.props?.role==="status"&&/centrale opslag/i.test(text(n)));});
+      assert.equal(s.data.get("crems.local-energy-profile.v2"),JSON.stringify(profile));assert.equal(s.data.get("crems.battery-analysis.v3"),JSON.stringify(saved));
+      button(tree,"3. Batterij").props.onClick();tree=h.render();assert.deepEqual(find(tree,n=>n.type===app.BatteryPlanner).props.saved,saved);
+      assert.match(text(tree),failure?/niet leesbaar/:/is leeg/);
+    }finally{h.dispose();}
+  }
+  globalThis.fetch=originalFetch;delete globals.window;
+});
+
+test("een centrale leesfout heeft voorrang op een lege tweede opslag",async()=>{
+  const originalFetch=globalThis.fetch;let requests=0;
+  const profile={version:2,savedAt:"2026-09-10T00:00:00Z",period:quality.period,measuredImportKwh:100,estimatedImportKwh:0,measuredExportKwh:50,estimatedExportKwh:0,measuredCount:35040,estimatedCount:0,noConsumptionCount:0,integrityReliable:true,gapCount:0,duplicateCount:0,overlapCount:0};
+  const s=storage();s.data.set("crems.local-energy-profile.v2",JSON.stringify(profile));globals.window={localStorage:s};
+  globalThis.fetch=async()=>{requests++;if(requests===1)throw Error("offline");return new Response(JSON.stringify({result:null}),{status:200,headers:{"Content-Type":"application/json"}});};
+  const h=host(app.App);
+  try{let tree=h.render();h.flush();await waitFor(()=>requests===2);await waitFor(()=>{tree=h.render();return nodes(tree).some(n=>n.props?.role==="status"&&/niet leesbaar/i.test(text(n)));});assert.match(text(tree),/niet leesbaar/);assert.doesNotMatch(text(tree),/centrale opslag is leeg/);assert.equal(s.data.get("crems.local-energy-profile.v2"),JSON.stringify(profile));}
+  finally{h.dispose();globalThis.fetch=originalFetch;delete globals.window;}
+});
+
+test("toont incomplete Home Assistant-kanalen nooit als gemeten nul",()=>{
+  const originalFetch=globalThis.fetch;globals.window={localStorage:{getItem:()=>null}};globals.__liveReading={source:"home-assistant",timestamp:"2026-09-25T10:00:00Z",quality:"incomplete",importPowerW:0,exportPowerW:0,importEnergyKwh:0,exportEnergyKwh:0};globalThis.fetch=async()=>new Response(JSON.stringify({result:null}),{status:200});
+  const h=host(app.App);
+  try{const tree=h.render();assert.match(text(tree),/Home Assistant · onvolledige meting/);assert.match(text(tree),/Onvolledige afname/);assert.match(text(tree),/Onvolledige injectie/);assert.doesNotMatch(text(tree),/0 W/);}
+  finally{h.dispose();globalThis.fetch=originalFetch;delete globals.window;delete globals.__liveReading;}
 });
 
 test("technisch bewaard rapport kan na bevestiging expliciet financieel worden aangevuld",()=>{

@@ -30,6 +30,24 @@ test("behoudt een echte nulmeting als geldige 0 W", () => {
   assert.equal(normalizePowerInWatts(powerState("0", "W")), 0);
 });
 
+test("markeert een ontbrekend of ongeldig vermogenskanaal als incomplete", async () => {
+  const originalFetch = globalThis.fetch;
+  for (const states of [
+    [{ ...powerState("0"), entity_id: "sensor.export_power" }],
+    [powerState("unknown"), { ...powerState("0"), entity_id: "sensor.export_power" }],
+  ]) {
+    globalThis.fetch = (async () => new Response(JSON.stringify(states), { status: 200 })) as typeof fetch;
+    try {
+      const source = new HomeAssistantSource("http://home-assistant.invalid", "test-token", {
+        importPower: "sensor.test_power", exportPower: "sensor.export_power",
+      });
+      const reading = await source.read();
+      assert.equal(reading.quality, "incomplete");
+      assert.equal(reading.exportPowerW, 0);
+    } finally { globalThis.fetch = originalFetch; }
+  }
+});
+
 test("verwerkt W en kW hoofdletterongevoelig en met omliggende spaties", () => {
   assert.equal(normalizePowerInWatts(powerState("0.25", " kW ")), 250);
   assert.equal(normalizePowerInWatts(powerState("250", " w ")), 250);

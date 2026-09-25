@@ -151,6 +151,7 @@ export class HomeAssistantSource implements MeterSource {
 
   private detect(states: HassState[]) {
     this.entities = {
+      ...this.entities,
       importPower: this.entities.importPower ?? best(states, ["power consumption", "power_consumption", "energieverbruik", "active power import", "vermogen afname"], "power"),
       exportPower: this.entities.exportPower ?? best(states, ["power production", "power_production", "energieproductie", "active power export", "vermogen injectie"], "power"),
       importEnergy: this.entities.importEnergy ?? best(states, ["energy consumption", "energy_consumption", "energieverbruik", "total consumption", "afname"], "energy"),
@@ -179,7 +180,7 @@ export class HomeAssistantSource implements MeterSource {
       voltageV: numericState(byId.get(this.entities.voltage ?? "")) || undefined,
       currentPriceEurKwh: numericState(byId.get(this.entities.currentPrice ?? "")),
       nextPriceEurKwh: numericState(byId.get(this.entities.nextPrice ?? "")),
-      quality: "measured",
+      quality: importPowerW !== undefined && exportPowerW !== undefined ? "measured" : "incomplete",
       source: "home-assistant",
     };
   }
@@ -211,7 +212,7 @@ export class SimulatedP1Source implements MeterSource {
       importEnergyKwh: Number(this.importTotal.toFixed(6)),
       exportEnergyKwh: Number(this.exportTotal.toFixed(6)),
       voltageV: 231.4,
-      quality: "measured",
+      quality: "estimated",
       source: "simulator",
     };
   }

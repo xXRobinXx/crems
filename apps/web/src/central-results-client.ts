@@ -31,13 +31,13 @@ type StoredResult = LocalEnergyProfile | LocalBatteryReport;
 type StorageSink = { setItem(key: string, value: string): void };
 
 const paths: Record<CentralResultKind, string> = {
-  "energy-profile": "/api/results/energy-profile",
-  "battery-report": "/api/results/battery-report",
+  "energy-profile": "api/results/energy-profile",
+  "battery-report": "api/results/battery-report",
 };
 
 const endpoint = (baseUrl: string, kind: CentralResultKind): string => {
   const base = baseUrl.trim().replace(/\/+$/, "");
-  return `${base}${paths[kind]}`;
+  return base ? `${base}/${paths[kind]}` : paths[kind];
 };
 
 const responseBody = async (response: Response): Promise<unknown> => {

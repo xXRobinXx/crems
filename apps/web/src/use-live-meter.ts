@@ -30,7 +30,7 @@ export const useLiveMeter = () => {
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    const events = new EventSource("/api/stream");
+    const events = new EventSource("api/stream");
     events.onmessage = (event) => {
       const parsed = parseLiveMeterEvent(event.data);
       if (!parsed) return;

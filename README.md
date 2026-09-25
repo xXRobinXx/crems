@@ -11,7 +11,7 @@ Zelfstandige energie-app die naast Home Assistant draait. De productiecode staat
 - zelfstandige frontend met Home Assistant als optionele read-only databron;
 - lokaal gebonden aan `127.0.0.1`.
 
-Nog niet vrijgegeven als complete productflow: duurzaam financieel batterijrapport, persoonlijke contractvergelijking en Raspberry Pi-deployment. Zie `PRODUCT_AUDIT.md` en de actieve Task 035.
+Nog niet vrijgegeven als complete productflow: duurzaam financieel batterijrapport, persoonlijke contractvergelijking en Raspberry Pi-deployment. De audit van 24 september 2026 meldt daarnaast open P1-herstelpunten in centrale opslag, bronkwaliteit en financiële snapshotvalidatie. Zie `PRODUCT_AUDIT.md`, `docs/full-audit-2026-09-24.md` en de actieve audit-/hersteltaak in `TASKS.md`.
 
 ## Structuur
 

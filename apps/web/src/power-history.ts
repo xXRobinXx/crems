@@ -52,7 +52,7 @@ export type PowerHistoryWindow = { start: string; end: string };
 
 export const loadPowerHistory = async (window: PowerHistoryWindow, signal: AbortSignal, request: typeof fetch = fetch) => {
   const query = new URLSearchParams(window);
-  const response = await request(`/api/history/power?${query.toString()}`, { method: "GET", signal });
+  const response = await request(`api/history/power?${query.toString()}`, { method: "GET", signal });
   if (!response.ok) throw new Error("HISTORY_REQUEST_FAILED");
   const parsed = parsePowerHistoryResponse(await response.json());
   if (!parsed) throw new Error("INVALID_HISTORY_RESPONSE");
