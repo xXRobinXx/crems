@@ -4,7 +4,7 @@
 
 ### Task 058 — Geoptimaliseerde versie op de Raspberry Pi publiceren — 27 september 2026
 
-**Status:** IN PROGRESS — beide addonmanifesten staan op 0.1.11; Agent B-prep en lokale checks PASS; Agent A voert release/installatie en live review uit op basis van de bestaande gebruikersopdracht.
+**Status:** IN PROGRESS — beide addonmanifesten staan op 0.1.11; Agent B-prep en lokale checks PASS; gebruiker heeft na de veiligheidsreview expliciet toestemming gegeven voor push/publicatie. Commit `08fffc0` staat klaar; imagebuild, Pi-installatie en live verificatie lopen nog.
 
 Doel: de goedgekeurde taken 055–057 als add-onrelease op de al ingestelde Home Assistant-Pi publiceren en werkelijk gedrag controleren. Write set: `crems/config.yaml`, `apps/home-assistant-addon/crems/config.yaml`, `apps/bridge/test/production-start.test.ts`, `docs/task-037-haos-app.md`, `TASKS.md`, `REVIEW.md`; staging/push/release tag/image-installatie alleen na lokale review. Verhoog beide manifests synchroon naar 0.1.11; de bestaande workflow bouwt en publiceert de ARM64-image op expliciete release-tag. Commit de reeds goedgekeurde web-/bridgecode mee. Geen HA-hostrestart of contract-API/scraping.
 

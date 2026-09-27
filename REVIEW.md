@@ -2,7 +2,7 @@
 
 ## Task 058 — geoptimaliseerde versie op de Raspberry Pi publiceren — IN PROGRESS
 
-Task 057 is goedgekeurd. De vrijgegeven assetbuild is lokaal gevalideerd; 0.1.11 manifesteert nog niet en Pi-publicatie/installatie is nog niet uitgevoerd. Lokale code- en imagevalidatie, live update, browsercontrole, profielbehoud, rollback en logredactie blijven open voor Task 058. Geen Pi-performanceclaim voordat cold/warm gedrag gemeten is.
+Task 057 is goedgekeurd. De gebruiker gaf na automatische veiligheidsreview expliciet toestemming om de lokaal gevalideerde release te pushen en te publiceren. De releasecommit is `08fffc0`; imagebuild, Pi-installatie, browsercontrole, profielbehoud, rollback en logredactie worden nog geverifieerd. Geen Pi-performanceclaim voordat cold/warm gedrag gemeten is.
 
 ## Task 057 — eerste-lading assets verkleinen en veilig cachen — APPROVED — 27 september 2026
 
