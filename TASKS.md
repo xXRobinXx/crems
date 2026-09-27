@@ -2,7 +2,48 @@
 
 ## Current Task
 
-Geen actieve implementatietaak. De code-auditcorrecties uit Task 054 zijn afgerond; externe deployment-, browser- en contract-API-gates staan hieronder apart geblokkeerd/open.
+### Task 058 — Geoptimaliseerde versie op de Raspberry Pi publiceren — 27 september 2026
+
+**Status:** IN PROGRESS — beide addonmanifesten staan op 0.1.11; Agent B-prep en lokale checks PASS; Agent A voert release/installatie en live review uit op basis van de bestaande gebruikersopdracht.
+
+Doel: de goedgekeurde taken 055–057 als add-onrelease op de al ingestelde Home Assistant-Pi publiceren en werkelijk gedrag controleren. Write set: `crems/config.yaml`, `apps/home-assistant-addon/crems/config.yaml`, `apps/bridge/test/production-start.test.ts`, `docs/task-037-haos-app.md`, `TASKS.md`, `REVIEW.md`; staging/push/release tag/image-installatie alleen na lokale review. Verhoog beide manifests synchroon naar 0.1.11; de bestaande workflow bouwt en publiceert de ARM64-image op expliciete release-tag. Commit de reeds goedgekeurde web-/bridgecode mee. Geen HA-hostrestart of contract-API/scraping.
+
+Acceptatie: volledige tests/build/typecheck groen; exacte gepubliceerde tag en image-digest vastgelegd; via de reeds geconfigureerde repository op HAOS/Pi bijgewerkt met restorepunt; HA-addon meldt 0.1.11 en draait via Ingress. Controleer geïnstalleerde site op 375/1280 px, hard refresh met hash-assets, actuele meter en prijs/veilige upstream-foutstate, browserfouten, opslagprofielen blijven beschikbaar na add-onrestart en documenteer een uitvoerbare rollback naar 0.1.10. Bekijk addonlogs uitsluitend op configuratie-/tokenlek met redactie; lees of rapporteer geen geheimen. Herstel voorafgaande addon/image bij een regressie. Agent C rapporteert per scenario; geen hostrestart. Het resultaat bewijst Pi-deployment, geen hardwareprestatieclaim tenzij cold/warm metingen zijn vastgelegd.
+
+### Task 057 — Eerste-lading assets verkleinen en veilig cachen — 27 september 2026
+
+**Status:** APPROVED — code/tests/build/typecheck en Agent C productiebridge-/Ingress-controle PASS; geen Pi-deployment.
+
+Gebruikersdoel: koude en herhaalde paginalading versnellen zonder verouderde UI, live meterdata of persoonlijke opslag te cachen. Write set: `apps/web/scripts/build.mjs`, `apps/web/scripts/dev.mjs`, `apps/bridge/src/server.ts`, `apps/bridge/test/production-start.test.ts`, `TASKS.md`, `REVIEW.md`. Productie-JS/CSS minificeren, source maps niet publiceren, JS/CSS-bestandsnamen van een inhoudshash voorzien, HTML op `no-store` houden, uitsluitend gehashte statische assets immutable cachebaar maken; live meter/prijs-, overige API-, SSE- en centrale opslagresponses blijven `no-store`. Behoud de bestaande publieke BELPEX-archiefresponse-cache (`max-age=86400`) voor die onveranderlijke historische data. Development behoudt de bestaande vaste assetnamen en source maps. Geen nieuwe dependency, prijs-/metersemantiek of Pi-deployment in deze taak.
+
+Baseline: JS 1.300.754 B (gzip 231.040 B; Brotli 175.884 B), CSS 23.389 B (gzip 4.723 B; Brotli 4.057 B). Productie: JS 316.771 B (gzip 94.644 B; Brotli 82.147 B), CSS 18.353 B (gzip 4.310 B; Brotli 3.731 B). Geen HTTP-compressie toegevoegd of Pi-LCP geclaimd. Gehashte JS/CSS alleen krijgen `public, max-age=31536000, immutable`; HTML/API/SSE/opslag/ongehashte onbekende assets `no-store`; BELPEX-archief behoudt 24-uurcache. Bridge regressietest controleert productieassets/hashverandering/devmodus en echte HTTP-headers via root- en Ingresspaden. Volledige suites core 65, bridge 93, web 127; typecheck, build en diff-check PASS.
+
+Agent C productiebridge op root en `/api/hassio_ingress/test-session/`: huidige hashes (`app-ad1e8539488a9532.js`, `app-58ce05b39059b9c8.css`) geven 200 en immutable cache; warme reload draagt 0 assetbytes over, hard refresh haalt de volledige assets opnieuw op. HTML, live API's, SSE en opslag no-store; BELPEX max-age=86400; unknown hash/file levert geen oude JS op. Verse geïsoleerde browsercontext met schema-valide synthetische prijs-/verbruiksrespons gaf nul console/page errors en nul 5xx; de echte HTML/assets kwamen van de bridge. Zonder fixtures gaf het afgesloten externe prijsverzoek 502; UI bleef veilig zonder crash. Dit is geen Pi-metingenbewijs. Geen screenshot of Pi wijziging.
+
+## Backlog
+
+- Pi-release na Task 057: nieuwe addonimage publiceren/installeren, koude en warme load meten, profielbehoud en rollback verifiëren; open checks uit Task 052 blijven van kracht.
+- Security: verifieer runtime logs zonder token/PII en opslagroutes in Pi-runtime; statische code toont alleen Supervisor-peerrestrictie, geen CORS allow-origin.
+
+### Task 056 — Compact mobiel overzicht — 27 september 2026
+
+**Status:** APPROVED — code/tests/build PASS; Agent C 320/375/768/1280/1440, refresh, keyboard en foutafhandeling PASS.
+
+Write set: `apps/web/src/styles.css`, `apps/web/test/overview-responsive.test.ts`, `TASKS.md`, `REVIEW.md`. Bestaande desktop/tablet-layout behouden; onder 520 px overzichtskaarten 2 kolommen met 1 kolom alleen onder 360 px; bridge/data-status blijft zichtbaar met wrap; knop-/nav-touchtargets minimaal 44 px; voorkom viewport-horizontale overflow bij 320/375 px. Geen inhoudelijke dashboard-, API-, polling- of securitywijziging. Acceptance: gerichte responsive-structuurtests voor breakpoints/touchtargets/status; web typecheck/build; Agent C visuele controle op 320/375/768/1280.
+
+Root review: CSS-wijziging volgt de vastgelegde breakpoints; regressietests dekken kolommen/status/touchtarget. Agent C controleerde lokaal in geïsoleerde headless-browsercontexten: desktop 1440×1000, mobiel 375×1100 en 320×1100; aanvullende controle op 768×900 en 1280×900. Op alle gemeten breedtes document-, client-, scroll- en bodybreedtes zijn gelijk; geen overflow of browserfouten. KPI's staan op 375 px in twee kolommen, op 320 px in één kolom, op 768 px in twee bij twee en op desktop in vier kolommen. Status, prijzen, grafiek en knoppen blijven zichtbaar; nav-, dagkeuze- en CSV-touchtargets zijn ≥44 px. Hard refresh zonder cache herstelt data en grafiek; keyboardfocus is zichtbaar; geïsoleerde prijs-API-fout toont veilige melding terwijl live meterdata doorwerkt. Screenshots: 320, 375 en 1440 px, lokaal vastgelegd buiten repository.
+
+Validatie door review: responsive-tests 2/2 PASS; volledige websuite 127/127 PASS; `pnpm build` PASS; `pnpm typecheck` PASS; `git diff --check` PASS. Normale sandbox-run van webtests werd door Windows-bestandstoegang geblokkeerd; dezelfde tests slaagden ongewijzigd buiten de sandbox. Geen Pi-deployment in deze taak.
+
+### Task 055 — Spotprijsrespons hergebruiken in browsercache — 25 september 2026
+
+**Status:** APPROVED — volledige build, tests en typecheck PASS; Agent C desktop/refresh PASS; mobiele viewport is buiten scope en staat apart in Task 056.
+
+Gebruikersdoel: sneller overzicht na navigatie of refresh zonder verouderde prijzen of wijzigingen aan HA-/profieldata. Write set: `apps/web/src/price-history.ts`, `apps/web/test/price-history.test.ts`, `TASKS.md`, `REVIEW.md`. Benchmark met vaste fake response: verse load, herhaling binnen TTL, TTL-verval, fout en dagwissel. In-memory cache per Brussel-dag, maximaal 60 seconden, alleen gevalideerde succesvolle payloads, coalescing van overlappende requests; server blijft authoritative 10-minuten upstreamcache. Geen persistent/browser storage, geen cache van meterdata/centrale resultaten, geen dependencies en geen wijziging van prijsemantiek. Acceptatie: herhaalde verse dagrequest = 0 extra fetch; overlappendzelfde query = 1 fetch; verlopen/andere dag = fetch; fout/invalid niet bewaren; abort annuleert alleen caller-wachten; bron/timestamps/payload behouden. Agent C browsercontrole blijft aparte releasegate.
+
+Synthetische tests bewijzen 1 fetch voor twee overlappende identieke requests, 0 extra fetch binnen TTL, nieuwe fetch na TTL-verval en Brussel-middernacht, hergebruik van een volledige 96-kwartierreeks zonder extra responsebytes, geen cache van foutresponses en abort-isolatie. Definitieve controles: core 65/65, bridge 91/91, web 125/125, typecheck alle workspaces, volledige build, harness 5/5 en diff-check PASS. Agent C-browserrapport: lokaal desktop 1900×912 en refresh PASS; live meter/prijs/grafiek na refresh, geen horizontale overflow. Mobiel 375/320 NOT RUN wegens ontbrekende viewportinstelling in browserinstrumentatie; dat blijft expliciet open onder Task 056. Geen Pi-deployment in deze taak.
+
+### Previous tasks
 
 ### Task 054 — Onafhankelijke audit-follow-up: Ingress-runtime en statusweergave — 25 september 2026
 
@@ -58,13 +99,13 @@ Write set: `apps/web/src/App.tsx`, `apps/web/test/battery-flow-structure.test.ts
 
 ### Task 052 — Raspberry Pi-installatie en herstartcontrole
 
-**Status:** BLOCKED — repo/image-publicatie en toegang tot Home Assistant OS ontbreken op deze werkplek.
+**Status:** PARTIAL — 0.1.10 gepubliceerd en geïnstalleerd; live Ingress/Pi herstart- en rollbackgates blijven open.
 
-Doel: publiceer de actuele versie 0.1.10, installeer via HAOS custom app-repository en controleer Ingress. Acceptance: exacte ARM64 image digest/versie vastgelegd; HA-token komt alleen via Supervisor binnen; echte spotprijzen en bronstatus werken; lokale profielen blijven na add-on- en HA-herstart; rollback is uitvoerbaar; Agent C/browser PASS op 375 px en desktop. Gebruikers-Pi is externe staat en wordt niet als getest opgevoerd zonder verbinding.
+Doel: publiceer de actuele versie 0.1.10, installeer via HAOS custom app-repository en controleer Ingress. Releasebewijs 25 september 2026: GitHub Actions `36168814889` geslaagd; ARM64-image `ghcr.io/xxrobinxx/crems-energy:0.1.10`, digest `sha256:d491733674854d52a2c185726ed36cee78ed721b70ef954be80a9a9cb3fd8cdd`; via reeds ingestelde custom repository op gebruikers-HA geïnstalleerd met bewaarde backup. HA meldt huidige versie 0.1.10, `Wordt uitgevoerd`, Ingress aanwezig. `Web UI openen` laadt de app via `/api/hassio_ingress/.../`; live meterwaarde (447–449 W) ververst, Energy-Charts-info België geeft huidige en volgende spotprijs (25,5 en 24,4 ct/kWh) en vandaag 96 gepubliceerde waarden. Acceptance blijft open: lokale profielen na add-on-/HA-herstart, rollback-uitvoerbaarheid, Agent C/browser PASS op 375 px en desktop en exacte host-/peer/tokenconfiguratie vanuit HA logs. Geen HA-hostherstart uitgevoerd.
 
 ### Task 053 — Belgische contract-API toegang verkrijgen en aansluiten
 
-**Status:** TODO — bron/gebruikstoestemming ontbreekt.
+**Status:** TODO — bron/gebruikstoestemming ontbreekt; in 0.1.10 is geen automatische leverancierscontract-API aanwezig.
 
 Eerst een officieel gedocumenteerde en toegestane contract-API vaststellen. V-test, BruSim en CompaCWaPE zijn officiële vergelijkers, maar er is geen publieke consumer-API of algemene hergebruiktoestemming aangetroffen; VREG's open-data licentie geldt alleen voor Cijfers, BruSim beschrijft supplier tariff-card submission. Implementatie start pas nadat de eigenaar/API toegang, schema en rechten schriftelijk of in officiële documentatie bevestigt. Geen scraping van verborgen interne endpoints als productiedata. Als officiële toegang ontbreekt, blijft handmatige tarieffiche-invoer de ondersteunde route.
 

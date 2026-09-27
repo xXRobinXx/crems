@@ -4,8 +4,9 @@ import { readFile } from "node:fs/promises";
 import { createServer, request } from "node:http";
 import { extname, resolve } from "node:path";
 
-await import("./build.mjs");
+import { buildWeb } from "./build.mjs";
 const root = resolve(import.meta.dirname, "..");
+await buildWeb(root, false);
 const dist = resolve(root, "dist");
 const ctx = await context({
   entryPoints: [resolve(root, "src/main.tsx")], bundle: true, format: "esm",

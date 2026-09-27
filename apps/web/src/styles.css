@@ -25,3 +25,5 @@ header{height:auto;min-height:44px;gap:16px;flex-wrap:wrap}nav{flex-wrap:wrap;al
 
 .chart-times{position:relative;display:block;height:24px}.chart-times time{position:absolute;top:0}.chart-panel>svg text,.overview-price>svg text{font-size:15px}
 .price-extremes{gap:6px 18px;margin:10px 0;font-size:12px}.price-extremes span{flex:initial;min-width:0}.price-extremes strong{display:inline;font-size:13px}.chart-panel>svg,.overview-price>svg{height:285px;min-height:0}.chart-panel>svg text,.overview-price>svg text{font-size:11px}
+
+@media(max-width:520px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.metrics article{min-width:0;padding:12px}.metrics span,.metrics small{overflow-wrap:anywhere}.status{display:block;flex:1 1 100%;font-size:13px;overflow-wrap:anywhere}}@media(max-width:359px){.metrics{grid-template-columns:1fr}}

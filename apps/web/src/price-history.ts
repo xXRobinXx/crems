@@ -2,6 +2,10 @@ import type { DaySelection } from "./day-window";
 export type PricePoint = { timestamp: string; priceCtKwh: number; end?: string };
 export type PriceHistoryData = { day: DaySelection; start: string; end: string; source?: "Energy-Charts.info · Bundesnetzagentur | SMARD.de"; quality: "measured" | "incomplete" | "notPublished"; points: PricePoint[] };
 export type PriceHistoryState = { status: "unavailable" | "loading" | "error" } | { status: "success"; data: PriceHistoryData; refreshError?: boolean };
+const responseCacheMs = 60_000;
+type CachedResponse = { expiresAt: number; data: PriceHistoryData };
+const defaultNow = () => Date.now();
+const brusselsDate = (instant: number) => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Brussels", year: "numeric", month: "2-digit", day: "2-digit" }).format(instant);
 const iso = (value: unknown) => typeof value === "string" && Number.isFinite(Date.parse(value)) ? new Date(value).toISOString() : undefined;
 export const parsePriceHistoryResponse = (raw: unknown): PriceHistoryData | undefined => {
   if (!raw || typeof raw !== "object") return undefined; const value = raw as Record<string, unknown>;
@@ -15,8 +19,35 @@ export const parsePriceHistoryResponse = (raw: unknown): PriceHistoryData | unde
   if (value.source !== undefined && value.source !== "Energy-Charts.info · Bundesnetzagentur | SMARD.de") return undefined;
   return { day: value.day as DaySelection, start, end, ...(value.source ? { source: value.source as PriceHistoryData["source"] } : {}), quality: value.quality as PriceHistoryData["quality"], points: points.sort((a,b) => Date.parse(a.timestamp)-Date.parse(b.timestamp)) };
 };
-export const loadPriceHistory = async (day: DaySelection, signal: AbortSignal, request: typeof fetch = fetch) => {
-  const response = await request(`api/history/price?${new URLSearchParams({ day })}`, { method: "GET", signal });
-  if (!response.ok) throw new Error("PRICE_REQUEST_FAILED"); const data = parsePriceHistoryResponse(await response.json());
-  if (!data || data.day !== day) throw new Error("INVALID_PRICE_RESPONSE"); return data;
+export const createPriceHistoryLoader = (clock: () => number = defaultNow) => {
+  const responseCache = new Map<string, CachedResponse>();
+  const inflight = new Map<string, Promise<PriceHistoryData>>();
+  return async (day: DaySelection, signal: AbortSignal, request: typeof fetch = fetch): Promise<PriceHistoryData> => {
+    if (signal.aborted) throw new DOMException("Request aborted", "AbortError");
+    const key = `${brusselsDate(clock())}:${day}`;
+    const cached = responseCache.get(key);
+    if (cached && cached.expiresAt > clock()) return cached.data;
+    responseCache.delete(key);
+    let pending = inflight.get(key);
+    if (!pending) {
+      pending = (async () => {
+        const response = await request(`api/history/price?${new URLSearchParams({ day })}`, { method: "GET", signal: new AbortController().signal });
+        if (!response.ok) throw new Error("PRICE_REQUEST_FAILED");
+        const data = parsePriceHistoryResponse(await response.json());
+        if (!data || data.day !== day) throw new Error("INVALID_PRICE_RESPONSE");
+        responseCache.set(key, { data, expiresAt: clock() + responseCacheMs });
+        return data;
+      })();
+      inflight.set(key, pending);
+      void pending.finally(() => { if (inflight.get(key) === pending) inflight.delete(key); }).catch(() => {});
+    }
+    return new Promise<PriceHistoryData>((resolve, reject) => {
+      const abort = () => reject(new DOMException("Request aborted", "AbortError"));
+      signal.addEventListener("abort", abort, { once: true });
+      pending!.then(resolve, reject).finally(() => signal.removeEventListener("abort", abort));
+      if (signal.aborted) abort();
+    });
+  };
 };
+
+export const loadPriceHistory = createPriceHistoryLoader();

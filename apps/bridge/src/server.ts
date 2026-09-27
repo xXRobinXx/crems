@@ -69,6 +69,7 @@ const server = createServer((request, response) => {
   }
   const url = stripHomeAssistantIngressPrefix(request.url ?? "/", request.headers.host);
   request.url = `${url.pathname}${url.search}`;
+  response.setHeader("Cache-Control", "no-store");
   if (handleBridgeRoutePrelude(request, response, source)) return;
   if (handleHealthRequest(request, response, {
     source: source.name,
@@ -96,13 +97,18 @@ const server = createServer((request, response) => {
     let file = resolve(root, safePath);
     const relativePath = relative(root, file);
     if (relativePath.startsWith("..") || resolve(root, relativePath) !== file) return json(response, 404, { error: "not_found" });
-    if (!existsSync(file) || statSync(file).isDirectory()) file = resolve(root, "index.html");
+    const isAsset = existsSync(file) && statSync(file).isFile();
+    if (!isAsset) file = resolve(root, "index.html");
     const contentTypes: Record<string, string> = {
       ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
       ".css": "text/css; charset=utf-8", ".json": "application/json; charset=utf-8",
       ".svg": "image/svg+xml", ".png": "image/png",
     };
-    response.writeHead(200, { "Content-Type": contentTypes[extname(file)] ?? "application/octet-stream" });
+    response.writeHead(200, {
+      "Content-Type": contentTypes[extname(file)] ?? "application/octet-stream",
+      "Cache-Control": isAsset && /^assets\/app-[a-f0-9]{16}\.(?:js|css)$/.test(safePath)
+        ? "public, max-age=31536000, immutable" : "no-store",
+    });
     if (request.method === "HEAD") return response.end();
     return createReadStream(file).pipe(response);
   }

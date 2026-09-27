@@ -1,12 +1,78 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parsePriceHistoryResponse, type PriceHistoryData, type PriceHistoryState } from "../src/price-history.ts";
+import { createPriceHistoryLoader, parsePriceHistoryResponse, type PriceHistoryData, type PriceHistoryState } from "../src/price-history.ts";
 import { createPriceHistoryController } from "../src/price-history-controller.ts";
 import { priceIntervals, scalePriceHistory, spotPriceAt } from "../src/price-chart.ts";
 
 const base: PriceHistoryData = { day: "today", start: "2026-08-28T00:00:00.000Z", end: "2026-08-29T00:00:00.000Z", quality: "measured", points: [
   { timestamp: "2026-08-28T01:00:00.000Z", priceCtKwh: 0 }, { timestamp: "2026-08-28T02:00:00.000Z", priceCtKwh: -5 }, { timestamp: "2026-08-28T03:00:00.000Z", priceCtKwh: 10 },
 ] };
+
+test("prijsresponses coalescen en hergebruiken alleen gevalideerde dagdata", async () => {
+  let clock = Date.parse("2026-08-28T12:00:00.000Z");
+  const load = createPriceHistoryLoader(() => clock);
+  let fetches = 0;
+  let resolveFetch!: (value: Response) => void;
+  const request = (() => { fetches += 1; return new Promise<Response>(resolve => { resolveFetch = resolve; }); }) as typeof fetch;
+  const first = load("today", new AbortController().signal, request);
+  const second = load("today", new AbortController().signal, request);
+  assert.equal(fetches, 1);
+  resolveFetch(new Response(JSON.stringify(base), { status: 200 }));
+  assert.deepEqual(await first, base);
+  assert.deepEqual(await second, base);
+  assert.deepEqual(await load("today", new AbortController().signal, request), base);
+  assert.equal(fetches, 1);
+  clock += 60_001;
+  const expired = (async () => { fetches += 1; return new Response(JSON.stringify(base), { status: 200 }); }) as typeof fetch;
+  assert.deepEqual(await load("today", new AbortController().signal, expired), base);
+  assert.equal(fetches, 2);
+  await load("tomorrow", new AbortController().signal, (async () => { fetches += 1; return new Response(JSON.stringify({ ...base, day: "tomorrow" }), { status: 200 }); }) as typeof fetch);
+  assert.equal(fetches, 3);
+  clock = Date.parse("2026-08-28T22:01:00.000Z");
+  await load("today", new AbortController().signal, expired);
+  assert.equal(fetches, 4);
+});
+
+test("afgebroken caller breekt geen gedeelde prijsopvraag voor andere caller", async () => {
+  const load = createPriceHistoryLoader();
+  let resolveFetch!: (value: Response) => void;
+  let fetchSignal: AbortSignal | undefined;
+  const request = ((_input: RequestInfo | URL, init?: RequestInit) => { fetchSignal = init?.signal as AbortSignal; return new Promise<Response>(resolve => { resolveFetch = resolve; }); }) as typeof fetch;
+  const aborted = new AbortController();
+  const first = load("today", aborted.signal, request);
+  const second = load("today", new AbortController().signal, request);
+  aborted.abort();
+  await assert.rejects(first, { name: "AbortError" });
+  assert.equal(fetchSignal?.aborted, false);
+  resolveFetch(new Response(JSON.stringify(base), { status: 200 }));
+  assert.deepEqual(await second, base);
+});
+
+test("mislukte of ongeldige prijsopvraag wordt niet gecachet", async () => {
+  const load = createPriceHistoryLoader();
+  let fetches = 0;
+  const failing = (async () => { fetches += 1; return new Response("{}", { status: 502 }); }) as typeof fetch;
+  await assert.rejects(load("today", new AbortController().signal, failing));
+  await assert.rejects(load("today", new AbortController().signal, failing));
+  assert.equal(fetches, 2);
+});
+
+test("cache bewaart alle 96 kwartierwaarden zonder extra responsebytes bij hergebruik", async () => {
+  const load = createPriceHistoryLoader();
+  const start = Date.parse("2026-08-28T00:00:00.000Z");
+  const data: PriceHistoryData = { day: "today", start: new Date(start).toISOString(), end: new Date(start + 86_400_000).toISOString(), quality: "measured", points: Array.from({ length: 96 }, (_, index) => ({ timestamp: new Date(start + index * 900_000).toISOString(), end: new Date(start + (index + 1) * 900_000).toISOString(), priceCtKwh: index / 10 })) };
+  const body = JSON.stringify(data);
+  const bytes = new TextEncoder().encode(body).byteLength;
+  let fetches = 0;
+  let transferredBytes = 0;
+  const request = (async () => { fetches += 1; transferredBytes += bytes; return new Response(body, { status: 200 }); }) as typeof fetch;
+  const first = await load("today", new AbortController().signal, request);
+  const second = await load("today", new AbortController().signal, request);
+  assert.equal(first.points.length, 96);
+  assert.deepEqual(second, first);
+  assert.equal(fetches, 1);
+  assert.equal(transferredBytes, bytes);
+});
 
 test("parser bewaart alleen allowlistvelden en geldige nul/negatieve prijzen", () => {
   assert.deepEqual(parsePriceHistoryResponse({ ...base, token: "secret", points: base.points.map(point => ({ ...point, raw: true })) }), base);

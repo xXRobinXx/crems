@@ -1,12 +1,36 @@
 # Review
 
+## Task 058 — geoptimaliseerde versie op de Raspberry Pi publiceren — IN PROGRESS
+
+Task 057 is goedgekeurd. De vrijgegeven assetbuild is lokaal gevalideerd; 0.1.11 manifesteert nog niet en Pi-publicatie/installatie is nog niet uitgevoerd. Lokale code- en imagevalidatie, live update, browsercontrole, profielbehoud, rollback en logredactie blijven open voor Task 058. Geen Pi-performanceclaim voordat cold/warm gedrag gemeten is.
+
+## Task 057 — eerste-lading assets verkleinen en veilig cachen — APPROVED — 27 september 2026
+
+Productie-JS minificeert van 1.300.754 naar 316.771 B (gzip 231.040 naar 94.644 B); CSS van 23.389 naar 18.353 B (gzip 4.723 naar 4.310 B). Brotli-grootte daalde van 175.884 naar 82.147 B voor JS en 4.057 naar 3.731 B voor CSS. HTTP-compressie is niet toegevoegd; deze gzip/Brotli-cijfers zijn lokale bytevergelijkingen, niet de Pi-overdrachtsmeting.
+
+Root review bevestigt de buildhash is SHA-256 over exact de geserveerde JS/CSS-bytes, productie publiceert geen sourcemap en relatieve assetreferenties behouden geneste Ingress. Development houdt fixed-name assets/sourcemaps. Bridge geeft alleen matching gehashte JS/CSS immutable-cache; HTML, live meter/prijs, overige APIs, SSE, centrale opslag en unknown assets blijven no-store. De bestaande publieke 24-uurscache voor onveranderlijke BELPEX-archiefdata blijft intact. Geen dependency of prijs-/metersemantiek gewijzigd.
+
+Agent C gebruikte verse geïsoleerde contexts op de productiebridge voor root en `/api/hassio_ingress/test-session/`. De actuele JS/CSS hashes gaven HTTP 200 en immutable-header; cache bypass haalde ze opnieuw op en een warme herlaadbeurt gaf voor beide assets `transferSize=0`. HTML/API/SSE/opslagresponseheaders en BELPEX-uitzondering zijn gecontroleerd. Onbekende hash/file levert index-HTML met `no-store`, geen oude JS. Met schema-valide, expliciet synthetische price/power responses: 0 console/page errors en 0 5xx; assets en HTML kwamen rechtstreeks van de productiebridge. Zonder testfixtures gaf de externe prijsopvraag in de geïsoleerde host 502; dat staat als omgevingsbeperking en er is geen live Pi-bron geclaimd.
+
+Validatie door Agent A: volledige suites core 65, bridge 93, web 127 geslaagd; `pnpm build`, `pnpm typecheck`, `git diff --check` PASS. Agent B handoff en eigen review akkoord. Geen Pi deployment binnen Task 057.
+
+## Task 056 — compact mobiel overzicht — APPROVED — 27 september 2026
+
+Mobiele CSS zet overzichtskaarten op twee kolommen bij 375 px en één kolom bij 320 px, houdt Home Assistant-status zichtbaar en laat content wrappen; knoppen behouden minimaal 44 px hoogte. Root review vond de wijziging binnen de write set en geen codebevinding. Responsive structuurtests 2/2 PASS; volledige websuite 127/127 PASS; `pnpm build`, `pnpm typecheck` en `git diff --check` PASS. Een sandboxbeperking blokkeerde de eerste test-run toen esbuild het workspacebronpad niet kon lezen; ongewijzigde run buiten de sandbox slaagde.
+
+Agent C PASS vanuit verse, geïsoleerde lokale browsersessies op 320×1100, 375×1100, 768×900, 1280×900 en 1440×1000: geen horizontale overflow of browser/page errors; KPI-indeling past per breakpoint, status/prijs/grafiek zichtbaar en nav-/dagkeuze-/CSV-knoppen ≥44 px. Hard refresh met browsercache uit herstelt dashboard en data. Toetsenbordfocus is zichtbaar op nav en dagkeuze. Bij een geïsoleerde prijs-API-fout toont de UI een veilige lege prijs-/grafiekstate, zonder verlies van live meterdata. Maximaal drie screenshots zijn privacyveilig lokaal bewaard in de tijdelijke map. Geen Pi-deployment in deze taak.
+
+## Task 055 — spotprijsrespons hergebruiken in browsercache — 25 september 2026
+
+`loadPriceHistory` cachet gevalideerde succesresponses per Brusselse datum en dagkeuze 60 seconden in memory en coalesceert overlappende requests. Alleen wachten van een geannuleerde caller wordt afgebroken; een gedeelde request voor een tweede zichtbare consumer blijft lopen. Cache leegt bij page reload en bewaart geen HA- of persoonlijke data. Tests bewijzen 1 fetch voor gelijktijdige verzoeken, 0 extra fetch binnen TTL, een verse fetch na TTL-verval en Brusselse middernacht, identieke volledige 96-kwartierreeks zonder extra responsebytes, geen caching van failures en abort-isolatie. Eindgate: core 65/65, bridge 91/91, web 125/125, typecheck alle workspaces, volledige build, harness 5/5 en diff-check PASS. Agent C heeft lokaal desktop 1900×912 en refresh gecontroleerd: live meter, prijzen en grafiek herstellen, geen horizontale overflow. Mobiele 375/320 viewport NOT RUN wegens ontbrekende browser-viewportregeling; dit is apart vastgelegd in Task 056. Geen Pi-deployment. **Reviewbesluit: APPROVED voor Task 055-codewijziging.** Productrelease/uitrol wordt hiermee niet goedgekeurd; mobiele en Pi-releasegates blijven afzonderlijk open.
+
 ## Task 054 — onafhankelijke audit-follow-up — 25 september 2026
 
 De Astra-agent was door een usage-limiet niet inzetbaar; een aparte read-only agent (`/root/pi_api_audit`, exact onderliggend model niet zichtbaar in de runtime) vond een fout Ingress-basispad, geen server-side Supervisor-peerrestrictie, wildcard CORS op bridge-routes, incomplete livewaarden die als nul zichtbaar bleven, een centrale opslagfout die door een lege sibling-response kon worden overschreven en aanvankelijk een genormaliseerd pad dat niet naar routehandlers werd doorgegeven. Alle codepunten kregen regressies; de laatste read-only hercontrole vond geen concrete codebevindingen. Officiële HA-richtlijn bevestigt de verplichte peer `172.30.32.2` en documenteert `X-Ingress-Path`.
 
 **Automatisch bewijs:** volledige build PASS; core 65/65, web 121/121, bridge 91/91; typecheck alle workspaces PASS; harness 5/5 PASS; diff-check PASS. Regressies staan in `apps/bridge/test/ingress.test.ts`, `apps/bridge/test/production-start.test.ts` en `apps/web/test/battery-flow-structure.test.ts`.
 
-**Reviewbesluit:** codefixes voldoen aan de regressiecriteria. Productreview `CHANGES REQUIRED / NOT DEPLOYED` blijft van kracht omdat visueel gedrag een actuele Agent C PASS vereist en de image/Pi niet zijn gepubliceerd/geïnstalleerd. Externe blockers staan bij Tasks 052/053.
+**Reviewbesluit:** codefixes voldoen aan de regressiecriteria. Publicatie en installatie van 0.1.10 op de verbonden Home Assistant-Pi zijn op 25 september geverifieerd: HA toont de juiste versie als actief, de Ingress-webinterface laadt, meterdata ververst en Energy-Charts België toont gepubliceerde spotprijzen. Productreview blijft `CHANGES REQUIRED / NOT APPROVED`: volledige Agent C-browsermatrix (375 px/desktop), HA/add-on-herstart met behoud van profielen, rollback en runtimeconfiguratiebewijs zijn nog open. Belgische leverancierscontracten worden niet automatisch opgehaald; officiële API-toegang/rechten ontbreken en de app ondersteunt handmatige tariefinvoer. Zie Tasks 052/053. Er is geen volledige HA-hostherstart uitgevoerd.
 
 ## Task 045 — kwaliteitslabels meterbronnen — 25 september 2026
 
