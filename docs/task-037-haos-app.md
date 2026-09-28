@@ -1,6 +1,6 @@
 # Task 037 — CREMS als Home Assistant-app
 
-Status: CREMS Energy 0.1.11 is momenteel gepubliceerd en actief geïnstalleerd op de gekoppelde Home Assistant OS / Raspberry Pi 4 via Home Assistant Ingress. Task 059 bereidt de ongeconfigureerde release 0.1.12 voor. Na publicatie moet dit worden aangevuld met de exacte image-digest, installatie/restorepoint, 375/1280 viewportcontrole, browserconsole en cachebewijs; zie Task 058 en 059.
+Status: CREMS Energy 0.1.11 is momenteel actief op de gekoppelde Home Assistant OS / Raspberry Pi 4. Ongeconfigureerde release 0.1.12 is gepubliceerd op 28 september via workflow [36473247556](https://github.com/xXRobinXx/crems/actions/runs/36473247556), OCI-index `sha256:d517cc7bfea835d4d610135cd527b337b0e21b3910c4f167344a41b60a10f688`, ARM64 `sha256:b7b3a30e071852fb92030ab1a906ccf2d6021d55d851936ce0139a3ad90ec858`. Pi-installatie, 0.1.11-herstelpunt, 375/1280 viewportcontrole, browserconsole en cachebewijs zijn nog in uitvoering; zie Task 058 en 059.
 
 ## Doel
 
