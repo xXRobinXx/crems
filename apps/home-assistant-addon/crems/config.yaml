@@ -1,5 +1,5 @@
 name: CREMS Energie
-version: "0.1.11"
+version: "0.1.12"
 slug: crems_energy
 description: Lokale energie-inzichten met een read-only Home Assistant-koppeling
 url: https://github.com/xXRobinXx/crems
@@ -22,6 +22,9 @@ options:
   current_price_entity: ""
   next_price_entity: ""
   tomorrow_price_entity: ""
+  econtract_public_key: ""
+  econtract_private_key: ""
+  econtract_affiliate_id: ""
 schema:
   import_power_entity: str?
   export_power_entity: str?
@@ -31,3 +34,6 @@ schema:
   current_price_entity: str?
   next_price_entity: str?
   tomorrow_price_entity: str?
+  econtract_public_key: password?
+  econtract_private_key: password?
+  econtract_affiliate_id: str?

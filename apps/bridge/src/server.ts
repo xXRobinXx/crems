@@ -15,6 +15,8 @@ import { handleBelpexHistoryRequest } from "./belpex-history-route.js";
 import { CentralStorage } from "./central-storage.js";
 import { handleCentralStorageRequest } from "./central-storage-route.js";
 import { isHomeAssistantIngressPeer, stripHomeAssistantIngressPrefix } from "./ingress.js";
+import { createContractCatalogClient, type ContractCatalogConfig } from "./contract-catalog.js";
+import { handleContractCatalogRequest } from "./contract-catalog-route.js";
 
 const envPath = fileURLToPath(new URL("../.env", import.meta.url));
 const localEnv: Record<string, string> = {};
@@ -27,6 +29,11 @@ try {
 } catch { /* Lokale configuratie blijft optioneel. */ }
 const setting = (name: string) => process.env[name]?.trim() || localEnv[name]?.trim();
 const centralStorage = new CentralStorage(setting("CREMS_DATA_DIR") || fileURLToPath(new URL("../data/runtime", import.meta.url)));
+const contractCatalogConfig: ContractCatalogConfig = {
+  publicKey: setting("CREMS_ECONTRACT_PUBLIC_KEY") ?? "",
+  privateKey: setting("CREMS_ECONTRACT_PRIVATE_KEY") ?? "",
+  affiliateId: setting("CREMS_ECONTRACT_AFFILIATE_ID") ?? "",
+};
 
 const listenConfig = parseBridgeListenConfig(setting("CREMS_BRIDGE_PORT"), setting("CREMS_BRIDGE_HOST"));
 const webRoot = setting("CREMS_WEB_ROOT");
@@ -79,6 +86,7 @@ const server = createServer((request, response) => {
   if (handlePriceHistoryRequest(request, response, source)) return;
   if (handleBelpexHistoryRequest(request,response,belpexArchive)) return;
   if (handleCentralStorageRequest(request, response, centralStorage)) return;
+  if (handleContractCatalogRequest(request, response, () => createContractCatalogClient(contractCatalogConfig))) return;
   if (url.pathname === "/api/current") return json(response, 200, latest);
   if (url.pathname === "/api/stream") {
     response.writeHead(200, {

@@ -13,6 +13,9 @@ const mapping = {
   current_price_entity: "HASS_CURRENT_PRICE_ENTITY",
   next_price_entity: "HASS_NEXT_PRICE_ENTITY",
   tomorrow_price_entity: "HASS_TOMORROW_PRICE_ENTITY",
+  econtract_public_key: "CREMS_ECONTRACT_PUBLIC_KEY",
+  econtract_private_key: "CREMS_ECONTRACT_PRIVATE_KEY",
+  econtract_affiliate_id: "CREMS_ECONTRACT_AFFILIATE_ID",
 };
 for (const [option, variable] of Object.entries(mapping)) {
   const value = options[option];

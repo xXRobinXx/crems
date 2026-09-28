@@ -197,15 +197,27 @@ test("echte productie-HTTP responses cachen uitsluitend bestaande gehashte asset
 test("houdt addonversies en ARM64-releaseworkflow synchroon", () => {
   const rootConfig = readFileSync(resolve(repositoryRoot, "crems/config.yaml"), "utf8");
   const addonConfig = readFileSync(resolve(repositoryRoot, "apps/home-assistant-addon/crems/config.yaml"), "utf8");
+  const addonStart = readFileSync(resolve(repositoryRoot, "apps/home-assistant-addon/crems/run.mjs"), "utf8");
   const workflow = readFileSync(resolve(repositoryRoot, ".github/workflows/home-assistant-image.yml"), "utf8");
   const version = (config: string) => config.match(/^version: "([0-9]+\.[0-9]+\.[0-9]+)"$/m)?.[1];
-  assert.equal(version(rootConfig), "0.1.11");
+  assert.equal(version(rootConfig), "0.1.12");
   assert.equal(version(addonConfig), version(rootConfig));
   assert.match(workflow, /platforms: linux\/arm64/);
   assert.match(workflow, /ghcr\.io\/xxrobinxx\/crems-energy:\$\{\{ steps\.version\.outputs\.value \}\}/);
   assert.match(workflow, /ghcr\.io\/xxrobinxx\/crems-energy:latest/);
   assert.match(workflow, /INPUT_VERSION/);
   assert.doesNotMatch(workflow, /crems-energy:0\.1\.[0-8]/);
+  for (const config of [rootConfig, addonConfig]) {
+    assert.match(config, /econtract_public_key: ""/);
+    assert.match(config, /econtract_private_key: ""/);
+    assert.match(config, /econtract_affiliate_id: ""/);
+    assert.match(config, /econtract_public_key: password\?/);
+    assert.match(config, /econtract_private_key: password\?/);
+  }
+  assert.match(addonStart, /econtract_public_key: "CREMS_ECONTRACT_PUBLIC_KEY"/);
+  assert.match(addonStart, /econtract_private_key: "CREMS_ECONTRACT_PRIVATE_KEY"/);
+  assert.match(addonStart, /econtract_affiliate_id: "CREMS_ECONTRACT_AFFILIATE_ID"/);
+  assert.match(addonStart, /typeof value === "string" && value\.trim\(\)\) process\.env\[variable\] = value\.trim\(\)/);
 });
 
 test("gebouwde bridge stopt begrensd en veilig vóór startup bij een ongeldige poort", () => {

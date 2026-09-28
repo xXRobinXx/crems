@@ -1,6 +1,6 @@
 # Task 037 — CREMS als Home Assistant-app
 
-Status: ARM64 IMAGE HISTORISCH LOKAAL GEVALIDEERD — publicatie en installatie op Home Assistant OS nog open. Directe poortpublicatie is vervangen door Home Assistant Ingress.
+Status: CREMS Energy 0.1.11 is momenteel gepubliceerd en actief geïnstalleerd op de gekoppelde Home Assistant OS / Raspberry Pi 4 via Home Assistant Ingress. Task 059 bereidt de ongeconfigureerde release 0.1.12 voor. Na publicatie moet dit worden aangevuld met de exacte image-digest, installatie/restorepoint, 375/1280 viewportcontrole, browserconsole en cachebewijs; zie Task 058 en 059.
 
 ## Doel
 
@@ -35,4 +35,6 @@ CREMS moet als zelfstandige Home Assistant-app op Home Assistant OS kunnen draai
 
 De appmetadata, Dockerfile en startscript staan onder `apps/home-assistant-addon`. De gecombineerde runtime serveert web en API intern op poort 8099 en gebruikt in Home Assistant OS de interne Supervisor-API en Supervisor-token. De app wordt alleen via Home Assistant Ingress aangeboden; de webapp en opslag-API zijn niet als directe LAN-poort gepubliceerd.
 
-Beide addonmanifesten staan synchroon op versie `0.1.11`. De bestaande workflow valideert de gekozen tag/input tegen beide manifesten en publiceert een ARM64-image naar GHCR; voor deze versie is publicatie/installatie nog niet voltooid. De eerder vastgelegde Pi-installatie van `0.1.10` blijft de rollbackreferentie. Resterend voor Task 058: exacte `v0.1.11` image-digest, update via de reeds ingestelde repository, Ingress/browser-PASS, behoud van lokale profielen bij addonrestart, logcontrole zonder secrets en een geteste rollback naar `0.1.10`. Geen HA-hostrestart of huidige hardwareprestatieclaim.
+De eerder geïnstalleerde addonmanifesten en image zijn `0.1.11`. GitHub Actions run `36306593824` publiceerde tag `v0.1.11`; OCI-index `sha256:7da16f75a6f4d335ff62b0c719e06cedf1aabaf17871079fc02835a6c3790398`, ARM64-image `sha256:cd8402cd0de5aae6e1812ec54d312a67c0a390abb5093b598ac8f44de1f79b70`. Op de Pi meldt Home Assistant 0.1.11 actief en Ingress werkt. De lokale manifests zijn inmiddels verhoogd naar `0.1.12`; publicatie/installatie van die versie en een nieuw herstelpunt van `0.1.11` zijn nog pending. De eerdere herstelprocedure voor 0.1.10 is alleen historisch; bij 0.1.12-regressie moet de nieuwe `CREMS Energie 0.1.11` appback-up worden geselecteerd en alleen CREMS Energie worden teruggezet.
+
+Na update/herlaadbeurt zijn actuele HA-vermogenswaarden, Belgische spotprijzen en 96 dagwaarden zichtbaar gebleven. Het eerder bewaarde lokale profiel bleef in dezelfde browser beschikbaar na de add-onrestart. Logboekcontrole toonde bridge-startregels en `day-price=missing/configured`, zonder token-/secretwaarden in de bekeken regels. Agent C probeerde geïsoleerde Pi-browserchecks op 375×812 en 1280×900; beide werden vóór HTTP-response geblokkeerd door `ERR_NETWORK_ACCESS_DENIED`. Open voor Task 058 blijven die exacte viewports, Pi-console/Network-fouten en runtime-cacheheaders/resource-transfermeting. Geen Pi-LCP- of cold/warm-snelheidsclaim zonder die meting. Geen HA-hostrestart uitgevoerd.
