@@ -6,6 +6,8 @@ param(
 
     [switch] $InstallPi,
 
+    [switch] $ResumePublishedRelease,
+
     [string] $HomeAssistantUrl = $env:CREMS_HA_URL,
 
     [ValidateRange(1, 120)]
@@ -40,7 +42,7 @@ function Invoke-Supervisor([string] $Method, [string] $Path, [object] $Body = $n
     Invoke-RestMethod @request
 }
 
-function Wait-Workflow([string] $Commit, [string] $TagName, [DateTimeOffset] $PushedAt, [int] $TimeoutMinutes) {
+function Wait-Workflow([string] $Commit, [string] $TagName, [int] $TimeoutMinutes) {
     $api = "https://api.github.com/repos/xXRobinXx/crems/actions/runs?head_sha=$Commit&per_page=50"
     $headers = @{ 'User-Agent' = 'CREMS-release-script'; Accept = 'application/vnd.github+json' }
     $deadline = [DateTimeOffset]::UtcNow.AddMinutes($TimeoutMinutes)
@@ -48,7 +50,7 @@ function Wait-Workflow([string] $Commit, [string] $TagName, [DateTimeOffset] $Pu
     while ([DateTimeOffset]::UtcNow -lt $deadline) {
         $result = Invoke-RestMethod -Method Get -Uri $api -Headers $headers -TimeoutSec 30
         $workflow = $result.workflow_runs |
-            Where-Object { $_.name -eq 'Publish Home Assistant image' -and $_.head_sha -eq $Commit -and $_.event -eq 'push' -and $_.head_branch -eq $TagName -and [DateTimeOffset]::Parse($_.created_at) -ge $PushedAt.AddSeconds(-5) } |
+            Where-Object { $_.name -eq 'Publish Home Assistant image' -and $_.head_sha -eq $Commit -and $_.event -eq 'push' -and $_.head_branch -eq $TagName } |
             Sort-Object created_at -Descending |
             Select-Object -First 1
         if ($workflow -and $workflow.status -eq 'completed') {
@@ -72,7 +74,8 @@ function Confirm-Arm64Image([string] $ImageVersion) {
         Accept = 'application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json'
     }
     $response = Invoke-WebRequest -Method Get -Uri $manifestUri -Headers $manifestHeaders -TimeoutSec 30
-    $manifest = $response.Content | ConvertFrom-Json
+    $manifestJson = if ($response.Content -is [byte[]]) { [Text.Encoding]::UTF8.GetString($response.Content) } else { [string]$response.Content }
+    $manifest = $manifestJson | ConvertFrom-Json
     if (-not $manifest.manifests) { throw "Image $ImageVersion is geen multi-architecture manifestlijst." }
     if (-not ($manifest.manifests | Where-Object { $_.platform.os -eq 'linux' -and $_.platform.architecture -eq 'arm64' })) {
         throw "Image $ImageVersion bevat geen linux/arm64-manifest."
@@ -101,22 +104,26 @@ try {
         $parsedHaUrl = [Uri]$HomeAssistantUrl
         if ($parsedHaUrl.Scheme -notin @('http', 'https') -or $parsedHaUrl.UserInfo) { throw 'Home Assistant-URL moet http(s) zijn en mag geen gebruikersgegevens bevatten.' }
         $script:haBase = $parsedHaUrl.AbsoluteUri.TrimEnd('/')
-        $haToken = $env:CREMS_HA_TOKEN
-        if (-not $haToken) {
-            $secureToken = Read-Host 'Home Assistant long-lived token (wordt niet opgeslagen of afgedrukt)' -AsSecureString
-            $pointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureToken)
-            try { $haToken = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer) }
-            finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer) }
-        }
-        if (-not $haToken) { throw 'Home Assistant-token ontbreekt; er is niets gepubliceerd of geïnstalleerd.' }
-        $script:haToken = $haToken
     }
 
     $localTag = git tag --list $tag
-    if ($localTag) { throw "Lokale tag $tag bestaat al; tags worden nooit overschreven." }
-    $remoteTag = git ls-remote --tags origin "refs/tags/$tag"
-    if ($LASTEXITCODE -eq 0 -and $remoteTag) { throw "Tag $tag bestaat al op origin; tags worden nooit overschreven." }
+    $localTagCommit = if ($localTag) { (git rev-parse "$tag^{commit}").Trim() } else { $null }
+    $remoteTag = git ls-remote --tags origin "refs/tags/$tag*"
+    if ($LASTEXITCODE -eq 0 -and $remoteTag -and -not $ResumePublishedRelease) { throw "Tag $tag bestaat al; tags worden nooit overschreven. Gebruik -ResumePublishedRelease om exact deze onafgeronde release te hervatten." }
     if ($LASTEXITCODE -notin @(0, 2)) { throw 'Kon bestaande releasetag op origin niet controleren.' }
+    $tagCommit = $null
+    if ($ResumePublishedRelease) {
+        $remoteCommitLine = $remoteTag | Where-Object { $_ -match "refs/tags/$([regex]::Escape($tag))\^\{\}$" } | Select-Object -First 1
+        $remoteTagCommit = if ($remoteCommitLine) { ($remoteCommitLine -split '\s+')[0] } else { $null }
+        if (-not $localTagCommit -or -not $remoteTagCommit -or $remoteTagCommit -ne $localTagCommit) {
+            throw "Resume vereist een onveranderde lokale en remote tag $tag."
+        }
+        & git merge-base --is-ancestor $localTagCommit HEAD
+        if ($LASTEXITCODE -ne 0) { throw "Tag $tag is geen voorouder van HEAD; release kan niet veilig worden hervat." }
+        & git diff --quiet $localTagCommit HEAD -- . ':(exclude)tools/release-crems.ps1' ':(exclude)docs/**' ':(exclude)TASKS.md' ':(exclude)REVIEW.md' ':(exclude)PRODUCT_AUDIT.md'
+        if ($LASTEXITCODE -ne 0) { throw "Build-, dependency-, workflow- of andere input is gewijzigd na tag $tag; hervatten is geweigerd." }
+        $tagCommit = $localTagCommit
+    }
 
     Invoke-Checked 'pnpm' @('harness', 'check')
     Invoke-Checked 'pnpm' @('harness', 'gate')
@@ -128,22 +135,33 @@ try {
         return
     }
 
-    Invoke-Checked 'git' @('tag', '-a', $tag, '-m', "Release $tag")
-    $pushedAt = [DateTimeOffset]::UtcNow
-    try {
-        Invoke-Checked 'git' @('push', 'origin', "refs/tags/$tag")
-    }
-    catch {
-        git tag -d $tag | Out-Null
-        throw
+    if (-not $ResumePublishedRelease) {
+        Invoke-Checked 'git' @('tag', '-a', $tag, '-m', "Release $tag")
+        try {
+            Invoke-Checked 'git' @('push', 'origin', "refs/tags/$tag")
+        }
+        catch {
+            git tag -d $tag | Out-Null
+            throw
+        }
+        $tagCommit = $commit
     }
 
-    $run = Wait-Workflow -Commit $commit -TagName $tag -PushedAt $pushedAt -TimeoutMinutes $WorkflowTimeoutMinutes
+    $run = Wait-Workflow -Commit $tagCommit -TagName $tag -TimeoutMinutes $WorkflowTimeoutMinutes
     $imageDigest = Confirm-Arm64Image -ImageVersion $Version
     Invoke-Checked 'git' @('push', 'origin', 'main')
     Write-Host "ARM64-image gepubliceerd: $($run.html_url); OCI digest $imageDigest"
 
     if ($InstallPi) {
+        $haToken = $env:CREMS_HA_TOKEN
+        if (-not $haToken) {
+            $secureToken = Read-Host 'Home Assistant long-lived token (wordt niet opgeslagen of afgedrukt)' -AsSecureString
+            $pointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureToken)
+            try { $haToken = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer) }
+            finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer) }
+        }
+        if (-not $haToken) { throw "Release is gepubliceerd; start opnieuw met -ResumePublishedRelease om de Pi-update af te ronden." }
+        $script:haToken = $haToken
         $null = Invoke-Supervisor -Method Post -Path 'store/reload' -Body @{}
         $infoResponse = Invoke-Supervisor -Method Get -Path "store/addons/$haSlug"
         $info = $infoResponse.data

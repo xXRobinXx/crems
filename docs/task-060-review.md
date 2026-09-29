@@ -11,6 +11,6 @@ Hercontrole PASS:
 - Vergelijkingsinvoer staat boven de conditioneel gemounte contractpagina en blijft beschikbaar bij paginanavigatie.
 - Contractpagina en CSV-route werken zonder vooraf opgeslagen Energiepaspoort. De QA-variant voegt geen profiel toe dat echte gebruikers niet hebben.
 - Release weigert bijgehouden wijzigingen en ongecommitteerde bestanden, met uitzondering van het vooraf bestaande lokale `apps/web/test-price-run.txt`-logbestand.
-- Workflowselectie controleert commit, exacte tag, push-event en publicatietijd; daarna controleert de procedure de GHCR-manifestdigest en aanwezigheid van `linux/arm64`.
+- Workflowselectie controleert commit, exacte tag en push-event; daarna controleert de procedure de GHCR-manifestdigest en aanwezigheid van `linux/arm64`. Een hervatting weigert iedere wijziging sinds de tag in build-, dependency-, workflow- of overige invoer en staat alleen de releaseroutine en bijbehorende handleiding toe.
 
 Deze review is read-only. De reviewer voerde geen eigen tests uit, benaderde geen Raspberry Pi of contractprovider en beoordeelt geen echte CSV met gebruikersdata. De actuele automatische en browserverificatie staat apart beschreven in de Task 060-status en het Agent C-rapport.

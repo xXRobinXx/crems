@@ -4,7 +4,7 @@
 
 ### Task 060 — Fluvius-CSV gebruiken voor contractjaarverbruik — 29 september 2026
 
-**Status:** APPROVED — volledige tests/build/typecheck PASS, Astra/Agent A-review PASS en Agent C volledige localhost-flow PASS. Nieuwe ongeconfigureerde release `0.1.13` is klaar voor de herhaalbare uitrolprocedure; Pi-update volgt na commit en releasegate. Geen providerrequest.
+**Status:** APPROVED — volledige tests/build/typecheck PASS, Astra/Agent A-review PASS en Agent C volledige localhost-flow PASS. Tag `v0.1.13` en linux/arm64-image zijn gepubliceerd; Pi-installatie wacht op een long-lived HA-token die de gebruiker veilig in de terminalprompt invoert. Geen providerrequest.
 
 Doel: op de contractpagina een keuze bieden om jaarverbruik uit een Fluvius-CSV lokaal te controleren en daarna expliciet dag-/nacht-afname en injectie in het vergelijkingsformulier over te nemen. CSV-inhoud, EAN, meter-ID, bestandsnaam en kwartierregels worden niet opgeslagen of meegestuurd. Automatisch invullen vereist minstens 364 dagen dekking in elk van de vier registers, aansluiting op dezelfde begin-/eindperiode, betrouwbare volgorde en nul schattingen, gaps, overlaps, dubbels en afgekeurde rijen. Een latere vergelijking blijft afzonderlijk achter de bestaande privacycheckbox en actie.
 
@@ -14,7 +14,7 @@ Agent C-browserrapport `docs/task-060-browser-report.md`: verse geïsoleerde loc
 
 Agent A/Astra-audit `docs/task-060-review.md`: PASS na fixes voor behouden formulierstate, gebruik zonder lokaal Energiepaspoort, volledige commitcontrole vóór release en exacte taggebonden workflow-/linux-arm64-imageverificatie.
 
-Validatie: definitieve `pnpm harness check` PASS met 65 core-tests, 101 bridge-tests, 134 webtests, alle builds en typechecks; PowerShell-parser, `git diff --check` PASS; onafhankelijke review en browserflow PASS. Herhaalbare Windows-releaseprocedure staat in `tools/release-crems.ps1`; gebruik is beschreven in `docs/release-home-assistant.md`. Releasegateattestaties zijn lokaal vastgelegd. Pi-installatie voert het script uit na deze commit; provider blijft ongeconfigureerd.
+Validatie: `pnpm harness check` PASS met 65 core-tests, 101 bridge-tests, 134 webtests, alle builds en typechecks; PowerShell-parser, `git diff --check` PASS; onafhankelijke review en browserflow PASS. Release `v0.1.13` gebruikt workflow [36600366405](https://github.com/xXRobinXx/crems/actions/runs/36600366405), OCI-index `sha256:bd8000e778e61b94ac5a312b2f546e67e4943aa5a8adb9779858283e0ddc5add`, linux/arm64 `sha256:39c2ce281cbb8198ce6be876e8f44a1bf27ad82a94b02a89e8adb7d45925fccd`. Herhaalbare Windows-releaseprocedure staat in `tools/release-crems.ps1`; gebruik is beschreven in `docs/release-home-assistant.md`. Na de onderbroken eerste run is de resumefunctie gereviewd om exact deze tag veilig af te ronden. De HA-installatie moet nog worden bevestigd; provider blijft ongeconfigureerd.
 
 ## Previous Tasks
 
