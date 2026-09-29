@@ -56,11 +56,11 @@ const text=(node:any):string=>Array.isArray(node)?node.map(text).join(""):node&&
 const find=(tree:any,predicate:(n:any)=>boolean)=>{const node=nodes(tree).find(predicate);assert.ok(node,"expected UI element");return node;};
 const button=(tree:any,label:string)=>find(tree,n=>n.type==="button"&&text(n)===label);
 const waitFor=async(check:()=>boolean)=>{for(let i=0;i<100;i++){if(check())return;await new Promise(r=>setTimeout(r,1));}assert.fail("component did not settle");};
-test("lege navigatie legt voorwaarden zichtbaar uit en blokkeert activatie zonder focus te verwijderen",()=>{
+test("lege navigatie legt voorwaarden uit en laat contractformulier zonder lokaal profiel openen",()=>{
   globals.window={localStorage:{getItem:()=>null}};
   const h=host(app.App);
   try {
-    for(const label of ["2. Rapport","3. Batterij","4. Contract"]){
+    for(const label of ["2. Rapport","3. Batterij"]){
       const tree=h.render(), target=button(tree,label);
       assert.equal(target.props["aria-disabled"],true);
       assert.equal(target.props.disabled,undefined);
@@ -69,6 +69,12 @@ test("lege navigatie legt voorwaarden zichtbaar uit en blokkeert activatie zonde
       target.props.onClick();
       assert.equal(button(h.render(),"Overzicht").props["aria-current"],"page");
     }
+    button(h.render(),"4. Contract").props.onClick();
+    const page=find(h.render(),n=>typeof n.type==="function"&&n.type.name==="ContractComparisonPage");
+    assert.equal(button(h.render(),"4. Contract").props["aria-current"],"page");
+    const contract=host(page.type);
+    button(contract.render(page.props),"Kies Fluvius-CSV voor jaarverbruik");
+    contract.dispose();
     button(h.render(),"1. Data").props.onClick();
     assert.equal(button(h.render(),"1. Data").props["aria-current"],"page");
   }finally{h.dispose();delete globals.window;}

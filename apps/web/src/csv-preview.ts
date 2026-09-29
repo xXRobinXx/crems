@@ -5,7 +5,7 @@ import type { FluviusStreamSummary } from "@crems/core/fluvius-stream-preview";
 type SafeInterval = Pick<FluviusInterval, "start"|"end"|"direction"|"energyKwh"|"quality">;
 
 export type CsvPreview =
-  | { status: "success"; delimiter: ParsedCsv["delimiter"]; validCount: number; skippedCount: number; period: { start: string; end: string } | null; importKwh: number; exportKwh: number; measuredImportKwh:number;estimatedImportKwh:number;measuredExportKwh:number;estimatedExportKwh:number; measuredCount: number; estimatedCount: number; noConsumptionCount: number; gapCount: number; duplicateCount: number; overlapCount: number; integrityReliable: boolean; reasons: Record<FluviusReason,number>; first: SafeInterval|null; last: SafeInterval|null }
+  | { status: "success"; delimiter: ParsedCsv["delimiter"]; validCount: number; skippedCount: number; period: { start: string; end: string } | null; importKwh: number; exportKwh: number; measuredImportKwh:number;estimatedImportKwh:number;measuredExportKwh:number;estimatedExportKwh:number; registerKwh:{importDay:number;importNight:number;exportDay:number;exportNight:number}; registerCoverage:{importDay:{start:string;end:string;count:number}|null;importNight:{start:string;end:string;count:number}|null;exportDay:{start:string;end:string;count:number}|null;exportNight:{start:string;end:string;count:number}|null}; measuredCount: number; estimatedCount: number; noConsumptionCount: number; gapCount: number; duplicateCount: number; overlapCount: number; integrityReliable: boolean; reasons: Record<FluviusReason,number>; first: SafeInterval|null; last: SafeInterval|null }
   | { status: "error"; code: string; message: string };
 
 export type CsvPreviewOutcome =
@@ -32,12 +32,14 @@ export const mapCsvPreview = (outcome: CsvPreviewOutcome): CsvPreview => {
     try { mapped = "analyzed" in outcome ? outcome.analyzed : mapFluviusQuarterHours(outcome.parsed); }
     catch (error) { if (error instanceof FluviusSchemaError || (typeof error==="object"&&error!==null&&"code" in error&&(error as {code?:unknown}).code==="INVALID_FLUVIUS_SCHEMA")) return { status:"error",code:"INVALID_FLUVIUS_SCHEMA",message:"Dit bestand heeft niet het bewezen Fluvius-schema." }; throw error; }
     const safe=(interval:FluviusInterval|undefined):SafeInterval|null=>interval?{start:interval.start,end:interval.end,direction:interval.direction,energyKwh:interval.energyKwh,quality:interval.quality}:null;
+    const registerKwh="registerKwh" in mapped?mapped.registerKwh:mapped.intervals.reduce((sum,item)=>{sum[`${item.direction}${item.register==="day"?"Day":"Night"}` as keyof typeof sum]+=item.energyKwh;return sum;},{importDay:0,importNight:0,exportDay:0,exportNight:0});
+    const registerCoverage="registerCoverage" in mapped?mapped.registerCoverage:mapped.intervals.reduce((sum,item)=>{const key=`${item.direction}${item.register==="day"?"Day":"Night"}` as keyof typeof sum;const before=sum[key];sum[key]=before?{start:before.start<item.start?before.start:item.start,end:before.end>item.end?before.end:item.end,count:before.count+1}:{start:item.start,end:item.end,count:1};return sum;},{importDay:null as {start:string;end:string;count:number}|null,importNight:null as {start:string;end:string;count:number}|null,exportDay:null as {start:string;end:string;count:number}|null,exportNight:null as {start:string;end:string;count:number}|null});
     return {
       status: "success",
       delimiter: ";",
       validCount:"validCount" in mapped?mapped.validCount:mapped.intervals.length,skippedCount:mapped.skippedCount,
       period:"period" in mapped?mapped.period:mapped.intervals.length?{start:mapped.intervals[0]!.start,end:mapped.intervals.at(-1)!.end}:null,
-      importKwh:mapped.importKwh,exportKwh:mapped.exportKwh,measuredCount:mapped.measuredCount,estimatedCount:mapped.estimatedCount,noConsumptionCount:mapped.noConsumptionCount,
+      importKwh:mapped.importKwh,exportKwh:mapped.exportKwh,registerKwh,registerCoverage,measuredCount:mapped.measuredCount,estimatedCount:mapped.estimatedCount,noConsumptionCount:mapped.noConsumptionCount,
       measuredImportKwh:mapped.measuredImportKwh,estimatedImportKwh:mapped.estimatedImportKwh,measuredExportKwh:mapped.measuredExportKwh,estimatedExportKwh:mapped.estimatedExportKwh,
       gapCount:mapped.gapCount,duplicateCount:mapped.duplicateCount,overlapCount:mapped.overlapCount,integrityReliable:"integrityReliable" in mapped ? mapped.integrityReliable : true,reasons:{...mapped.reasons},first:"first" in mapped?safe(mapped.first??undefined):safe(mapped.intervals[0]),last:"last" in mapped?safe(mapped.last??undefined):safe(mapped.intervals.at(-1)),
     };

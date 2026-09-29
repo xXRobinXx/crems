@@ -2,6 +2,22 @@
 
 ## Current Task
 
+### Task 060 — Fluvius-CSV gebruiken voor contractjaarverbruik — 29 september 2026
+
+**Status:** APPROVED — volledige tests/build/typecheck PASS, Astra/Agent A-review PASS en Agent C volledige localhost-flow PASS. Nieuwe ongeconfigureerde release `0.1.13` is klaar voor de herhaalbare uitrolprocedure; Pi-update volgt na commit en releasegate. Geen providerrequest.
+
+Doel: op de contractpagina een keuze bieden om jaarverbruik uit een Fluvius-CSV lokaal te controleren en daarna expliciet dag-/nacht-afname en injectie in het vergelijkingsformulier over te nemen. CSV-inhoud, EAN, meter-ID, bestandsnaam en kwartierregels worden niet opgeslagen of meegestuurd. Automatisch invullen vereist minstens 364 dagen dekking in elk van de vier registers, aansluiting op dezelfde begin-/eindperiode, betrouwbare volgorde en nul schattingen, gaps, overlaps, dubbels en afgekeurde rijen. Een latere vergelijking blijft afzonderlijk achter de bestaande privacycheckbox en actie.
+
+Write set (één schrijver: root): `packages/core/src/fluvius-stream-preview.ts`, `packages/core/test/fluvius-stream-preview.test.ts`, `apps/web/src/{App.tsx,csv-preview.ts,contract-csv.ts,styles.css}`, `apps/web/test/contract-csv.test.ts`, `apps/home-assistant-addon/crems/config.yaml`, `crems/config.yaml`, `apps/bridge/test/production-start.test.ts`, `tools/release-crems.ps1`, `docs/release-home-assistant.md`, `TASKS.md`, `REVIEW.md`, `PRODUCT_AUDIT.md`, `docs/task-037-haos-app.md`. De eerder gegeven gebruikersopdracht om de website op de Raspberry Pi te publiceren geldt voor deze nieuwe ongeconfigureerde release; er wordt geen providerrequest gedaan.
+
+Agent C-browserrapport `docs/task-060-browser-report.md`: verse geïsoleerde localhost-test zonder opgeslagen profiel; postcode 1000/gewest Brussel, huishouden 4, variabel tarief en domiciliëring Nee bleven behouden nadat contractpagina naar CSV en terug navigeerde. Synthetisch 2025-bestand leverde 3.504 kWh per register; alle vier jaarvelden werden correct gevuld, consent bleef uit en compare disabled. Geen profiel opgeslagen of providerverzoek. Console-inspectie en Pi-runtime zijn niet in dit lokale rapport getest.
+
+Agent A/Astra-audit `docs/task-060-review.md`: PASS na fixes voor behouden formulierstate, gebruik zonder lokaal Energiepaspoort, volledige commitcontrole vóór release en exacte taggebonden workflow-/linux-arm64-imageverificatie.
+
+Validatie: definitieve `pnpm harness check` PASS met 65 core-tests, 101 bridge-tests, 134 webtests, alle builds en typechecks; PowerShell-parser, `git diff --check` PASS; onafhankelijke review en browserflow PASS. Herhaalbare Windows-releaseprocedure staat in `tools/release-crems.ps1`; gebruik is beschreven in `docs/release-home-assistant.md`. Releasegateattestaties zijn lokaal vastgelegd. Pi-installatie voert het script uit na deze commit; provider blijft ongeconfigureerd.
+
+## Previous Tasks
+
 ### Task 059 — Belgische contractcatalogus en opt-in vergelijking via Aanbieders.be — 28 september 2026
 
 **Status:** ongeconfigureerde release `v0.1.12` is gepubliceerd en op de Pi geïnstalleerd. Offline code/UI acceptatie PASS. Live partnerrechten, credentials en providerresponse ontbreken; de feature blijft veilig ongeconfigureerd en doet geen providerrequest.

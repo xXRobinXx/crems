@@ -13,6 +13,8 @@ export type FluviusStreamSummary = {
   measuredCount: number; estimatedCount: number; noConsumptionCount: number;
   gapCount: number; duplicateCount: number; overlapCount: number; integrityReliable: boolean; unorderedCount: number;
   importKwh: number; exportKwh: number; measuredImportKwh: number; estimatedImportKwh: number; measuredExportKwh: number; estimatedExportKwh: number;
+  registerKwh: { importDay:number;importNight:number;exportDay:number;exportNight:number };
+  registerCoverage: { importDay:{start:string;end:string;count:number}|null;importNight:{start:string;end:string;count:number}|null;exportDay:{start:string;end:string;count:number}|null;exportNight:{start:string;end:string;count:number}|null };
   period: { start: string; end: string } | null; first: FluviusInterval | null; last: FluviusInterval | null;
   skippedRows: Record<FluviusReason, number[]>; truncatedCount: number; retainedIntervalCount: number; retainedCandidateCount: number;
 };
@@ -57,6 +59,8 @@ export const createFluviusPreviewAnalyzer = (options: { onInterval?: (interval: 
   let header = true, rowNumber = 1, finished = false, validCount = 0, skippedCount = 0, first: FluviusInterval | null = null, last: FluviusInterval | null = null;
   let gapCount = 0, duplicateCount = 0, overlapCount = 0, unorderedCount = 0, measuredCount = 0, estimatedCount = 0, noConsumptionCount = 0;
   let importKwh = 0, exportKwh = 0, measuredImportKwh = 0, estimatedImportKwh = 0, measuredExportKwh = 0, estimatedExportKwh = 0, truncatedCount = 0;
+  const registerKwh={importDay:0,importNight:0,exportDay:0,exportNight:0};
+  const registerCoverage:NonNullable<FluviusStreamSummary["registerCoverage"]>={importDay:null,importNight:null,exportDay:null,exportNight:null};
   const reasons = newReasons(); const skippedRows: Record<FluviusReason, number[]> = { INVALID_DATE_TIME: [], INVALID_INTERVAL: [], INVALID_VALUE: [], INVALID_UNIT: [], INVALID_REGISTER: [], INVALID_STATUS: [] }; const streams = new Map<string, StreamState>();
   const skip = (reason: FluviusReason) => { skippedCount += 1; reasons[reason] += 1; if (skippedRows[reason].length < 20) skippedRows[reason].push(rowNumber); else truncatedCount += 1; };
   const scanner = createFluviusRowScanner((values) => {
@@ -76,12 +80,14 @@ export const createFluviusPreviewAnalyzer = (options: { onInterval?: (interval: 
     const item: FluviusInterval = { start: new Date(start).toISOString(), end: new Date(end).toISOString(), direction: register[0], register: register[1], energyKwh: energy, quality };
     if (state.previous) { if (Date.parse(item.start) < Date.parse(state.previous.start)) { state.ordered = false; unorderedCount += 1; } if (state.ordered) { const delta = Date.parse(item.start) - Date.parse(state.previous.end); if (delta > 0) gapCount += 1; else if (delta < 0) overlapCount += 1; if (item.start === state.previous.start && item.end === state.previous.end) duplicateCount += 1; } }
     state.previous = item; state.previousLocal = startLocal; streams.set(key, state); options.onInterval?.(item); validCount += 1; if (!first || item.start < first.start) first = item; if (!last || item.start > last.start) last = item;
+    const registerTotal=`${register[0]}${register[1]==="day"?"Day":"Night"}` as keyof typeof registerKwh;registerKwh[registerTotal]+=energy;
+    const coverage=registerCoverage[registerTotal];registerCoverage[registerTotal]=coverage?{start:coverage.start<item.start?coverage.start:item.start,end:coverage.end>item.end?coverage.end:item.end,count:coverage.count+1}:{start:item.start,end:item.end,count:1};
     if (quality === "measured") measuredCount += 1; else if (quality === "estimated") estimatedCount += 1; else noConsumptionCount += 1;
     if (item.direction === "import") { importKwh += energy; if (quality === "measured") measuredImportKwh += energy; if (quality === "estimated") estimatedImportKwh += energy; } else { exportKwh += energy; if (quality === "measured") measuredExportKwh += energy; if (quality === "estimated") estimatedExportKwh += energy; }
   });
   return {
     push(chunk: string) { if (finished) throw new Error("ANALYZER_FINISHED"); scanner.push(chunk); },
-    finish(): FluviusStreamSummary { if (finished) throw new Error("ANALYZER_FINISHED"); finished = true; scanner.finish(); if (header) throw new CsvParseError("EMPTY_INPUT", "CSV-invoer is leeg"); return { validCount, skippedCount, reasons, measuredCount, estimatedCount, noConsumptionCount, gapCount, duplicateCount, overlapCount, integrityReliable: [...streams.values()].every((state) => state.ordered), unorderedCount, importKwh, exportKwh, measuredImportKwh, estimatedImportKwh, measuredExportKwh, estimatedExportKwh, period: first && last ? { start: first.start, end: last.end } : null, first, last, skippedRows, truncatedCount, retainedIntervalCount: streams.size, retainedCandidateCount: 0 }; },
+    finish(): FluviusStreamSummary { if (finished) throw new Error("ANALYZER_FINISHED"); finished = true; scanner.finish(); if (header) throw new CsvParseError("EMPTY_INPUT", "CSV-invoer is leeg"); return { validCount, skippedCount, reasons, measuredCount, estimatedCount, noConsumptionCount, gapCount, duplicateCount, overlapCount, integrityReliable: [...streams.values()].every((state) => state.ordered), unorderedCount, importKwh, exportKwh, measuredImportKwh, estimatedImportKwh, measuredExportKwh, estimatedExportKwh, registerKwh, registerCoverage, period: first && last ? { start: first.start, end: last.end } : null, first, last, skippedRows, truncatedCount, retainedIntervalCount: streams.size, retainedCandidateCount: 0 }; },
   };
 };
 

@@ -200,7 +200,7 @@ test("houdt addonversies en ARM64-releaseworkflow synchroon", () => {
   const addonStart = readFileSync(resolve(repositoryRoot, "apps/home-assistant-addon/crems/run.mjs"), "utf8");
   const workflow = readFileSync(resolve(repositoryRoot, ".github/workflows/home-assistant-image.yml"), "utf8");
   const version = (config: string) => config.match(/^version: "([0-9]+\.[0-9]+\.[0-9]+)"$/m)?.[1];
-  assert.equal(version(rootConfig), "0.1.12");
+  assert.equal(version(rootConfig), "0.1.13");
   assert.equal(version(addonConfig), version(rootConfig));
   assert.match(workflow, /platforms: linux\/arm64/);
   assert.match(workflow, /ghcr\.io\/xxrobinxx\/crems-energy:\$\{\{ steps\.version\.outputs\.value \}\}/);
