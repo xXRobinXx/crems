@@ -88,6 +88,52 @@ const storage=()=>{const data=new Map<string,string>([["crems.battery-analysis.v
 const csv="Van (datum);Van (tijdstip);Tot (datum);Tot (tijdstip);EAN-code;Meter;Metertype;Register;Volume;Eenheid;Validatiestatus;Omschrijving\n01-06-2026;00:00:00;01-06-2026;00:15:00;;;synthetisch;Injectie Dag;1,0;kWh;Uitgelezen;\n";
 const analyzer=createFluviusPreviewAnalyzer();analyzer.push(csv);const checked=mapCsvPreview({ok:true,analyzed:analyzer.finish()});
 
+test("profielbewaring legt browserkopie en Pi-toegang uit vóór de expliciete actie en verstuurt geen CSV", async () => {
+  const originalFetch=globalThis.fetch;
+  const data=new Map<string,string>();let writes=0;
+  const requests:{method:string;body?:string}[]=[];
+  globals.window={localStorage:{getItem:(key:string)=>data.get(key)??null,setItem:(key:string,value:string)=>{writes++;data.set(key,value);}}};
+  globalThis.fetch=async(_url,init)=>{requests.push({method:init?.method??"GET",body:init?.body as string|undefined});return new Response(null,{status:204});};
+  const h=host(app.App);
+  try {
+    let tree=h.render();button(tree,"1. Data").props.onClick();tree=h.render();
+    const intro=find(tree,n=>n.type==="p"&&n.props?.className==="intro");
+    assert.match(text(intro),/deze browser/);assert.match(text(intro),/Raspberry Pi/);assert.match(text(intro),/toegang tot CREMS/);
+    assert.match(text(intro),/CSV-bestand.*EAN.*kwartierregels/);
+    find(tree,n=>n.type==="input"&&n.props.type==="file").props.onChange({target:{files:[{size:csv.length,stream:()=>new Blob([csv]).stream()}]}});
+    await waitFor(()=>{tree=h.render();return nodes(tree).some(n=>n.type==="button"&&text(n)==="Bewaar energiebalans");});
+    assert.equal(writes,0);assert.equal(requests.filter(r=>r.method==="PUT").length,0);
+    button(tree,"Bewaar energiebalans").props.onClick();
+    await waitFor(()=>requests.some(r=>r.method==="PUT"));
+    assert.equal(writes,1);
+    const payload=requests.find(r=>r.method==="PUT")!.body!;
+    assert.doesNotMatch(payload,/Van \(datum\)|synthetisch|EAN|quarter|intervals|fileName|csv/);
+    assert.equal(JSON.parse(payload).version,2);
+    tree=h.render();assert.doesNotMatch(text(tree),/succesvol gesynchroniseerd|op de Raspberry Pi bewaard/);
+  } finally {h.dispose();globalThis.fetch=originalFetch;delete globals.window;}
+});
+
+test("technische en legacy-bewaaracties tonen Pi-privacy zonder automatisch te bewaren", () => {
+  let writes=0;
+  const h=host(app.ReleaseBatteryResult);
+  try {
+    const tree=h.render({comparisons:technical.map(t=>({capacityKwh:t.capacityKwh,powerKw:t.powerKw,result:t})),quality,isSaved:false,onSave:()=>{writes++;return true;}});
+    const notice=find(tree,n=>n.type==="p"&&n.props?.className==="storage-privacy");
+    assert.match(text(notice),/deze browser/);assert.match(text(notice),/Raspberry Pi/);assert.match(text(notice),/toegang tot CREMS/);
+    assert.ok(nodes(tree).indexOf(notice)<nodes(tree).indexOf(button(tree,"Bewaar technisch batterijrapport")));
+    assert.equal(writes,0);
+  } finally {h.dispose();}
+  const s=storage();s.data.clear();s.data.set("crems.battery-analysis.v1",JSON.stringify({version:1,period:quality.period,comparisons:technical}));
+  const before=JSON.stringify([...s.data]);globals.window={localStorage:s};const legacy=host(app.App);
+  try {
+    let tree=legacy.render();button(tree,"3. Batterij").props.onClick();tree=legacy.render();
+    const notice=find(tree,n=>n.type==="p"&&n.props?.className==="storage-privacy");
+    assert.match(text(notice),/Raspberry Pi/);assert.match(text(notice),/toegang tot CREMS/);
+    assert.ok(nodes(tree).indexOf(notice)<nodes(tree).indexOf(button(tree,"Bewaar als nieuw technisch rapport")));
+    assert.equal(JSON.stringify([...s.data]),before);
+  } finally {legacy.dispose();delete globals.window;}
+});
+
 test("Planner effectherstart werkt; nieuw bestand erft geen oude kwaliteit of financiële bevestiging",async()=>{
   const originalFetch=globalThis.fetch;let reads=0,fetches=0;const s=storage();globals.window={localStorage:s};globalThis.fetch=async()=>{fetches++;return {ok:false} as Response;};
   const input={file:{size:csv.length,stream:()=>{reads++;return new Blob([csv]).stream();}},preview:checked};let report:any;
@@ -151,6 +197,9 @@ test("technisch bewaard rapport kan na bevestiging expliciet financieel worden a
   const values=["Synthetisch","2025-01-01","2026-01-02","Synthetisch","2026-01-02","10","30","4","15","2","3","3000","5000","7000","10000","13000"];
   const fields=nodes(find(tree,n=>n.props?.["aria-label"]==="Financiële context")).filter(n=>n.type==="input"&&n.props.type!=="checkbox");assert.equal(fields.length,values.length);fields.forEach((field,i)=>field.props.onChange({target:{value:values[i]}}));
   tree=h.render(props);const checks=nodes(tree).filter(n=>n.type==="input"&&n.props.type==="checkbox");checks.forEach(check=>check.props.onChange({target:{checked:true}}));tree=h.render(props);
+  const privacy=find(tree,n=>n.type==="p"&&n.props?.className==="storage-privacy");
+  assert.match(text(privacy),/contract- en offertegegevens/);assert.match(text(privacy),/Raspberry Pi/);
+  assert.ok(nodes(tree).indexOf(privacy)<nodes(tree).indexOf(button(tree,"Bewaar volledig batterijrapport")));
   button(tree,"Bewaar volledig batterijrapport").props.onClick();assert.deepEqual(savedFinancial,saved.financial);
   find(find(tree,n=>n.props?.["aria-label"]==="Financiële context"),n=>n.type==="input"&&n.props.type==="date").props.onChange({target:{value:"2025-02-01"}});tree=h.render(props);assert.equal(nodes(tree).filter(n=>n.type==="input"&&n.props.type==="checkbox").at(-1).props.checked,false);
   assert.equal(nodes(tree).some(n=>n.type==="button"&&text(n)==="Bewaar volledig batterijrapport"),false);h.dispose();
