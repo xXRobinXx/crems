@@ -1,5 +1,10 @@
 # Lokaal CREMS-harness
 
+## Actualisering — 1 oktober 2026 / Task 061
+
+Historische productprioriteiten: Task 060 maakte Contract bereikbaar zonder Energiepaspoort; de disabled-contractbeschrijving hieronder is vervangen. De actuele actieve taak is Task 061. Het harnessmechanisme blijft geldig; releasegate vereist actuele volledige review/browserattestaties.
+
+
 Dit ontwikkelgereedschap gebruikt TASKS.md als takenbron. Geen extra register, dependencies of browserbediening. Het verandert geen productgedrag. H001 is de gereedschapstaak; de productrelease van Task 035 blijft apart open.
 
 ## Gebruik

@@ -6,8 +6,15 @@ const keyForPath = (path: string): CentralResultKey | undefined => path === "/ap
 const send = (response: ServerResponse, status: number, value: unknown) => { response.writeHead(status, { ...headers, "Content-Type": "application/json" }); response.end(JSON.stringify(value)); };
 const readBody = (request: IncomingMessage, limit = 4 * 1024 * 1024): Promise<string> => new Promise((resolve, reject) => {
   let body = "";
+  let size = 0;
+  const declaredLength = Number(request.headers["content-length"]);
+  if (Number.isFinite(declaredLength) && declaredLength > limit) { request.pause(); reject(new Error("body_too_large")); return; }
   request.setEncoding("utf8");
-  request.on("data", (chunk: string) => { body += chunk; if (Buffer.byteLength(body, "utf8") > limit) { request.destroy(); reject(new Error("body_too_large")); } });
+  request.on("data", (chunk: string) => {
+    size += Buffer.byteLength(chunk, "utf8");
+    if (size > limit) { body = ""; request.pause(); reject(new Error("body_too_large")); return; }
+    body += chunk;
+  });
   request.on("end", () => resolve(body));
   request.on("error", reject);
 });
@@ -24,6 +31,10 @@ export const handleCentralStorageRequest = (request: IncomingMessage, response: 
     let value: unknown;
     try { value = JSON.parse(body); } catch { send(response, 400, { error: "invalid_json" }); return; }
     return storage.put(key, value).then(() => send(response, 204, {})).catch((error) => send(response, error instanceof StorageValidationError ? 400 : 500, { error: error instanceof StorageValidationError ? "invalid_result" : storageError(error) }));
-  }).catch((error) => send(response, error?.message === "body_too_large" ? 413 : 400, { error: error?.message === "body_too_large" ? "body_too_large" : "invalid_body" }));
+  }).catch((error) => {
+    const oversized = error?.message === "body_too_large";
+    if (oversized) response.once("finish", () => request.destroy());
+    send(response, oversized ? 413 : 400, { error: oversized ? "body_too_large" : "invalid_body" });
+  });
   return true;
 };

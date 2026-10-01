@@ -1,5 +1,10 @@
 # Centrale resultaten via Tailscale
 
+## Actualisering — 1 oktober 2026 / Task 061
+
+Historisch plan: de CSV-upload naar de Pi hieronder is niet het huidige ontwerp. CSV-verwerking blijft uitsluitend tijdelijk in de browser; expliciet bewaren verstuurt alleen gevalideerde veilige JSON-profiel-/rapportaggregaten naar de Pi. Toegang gebruikt geauthenticeerde Home Assistant Ingress, via LAN of Tailscale. Geen CSV-uploadendpoint ingevoerd. Zie Task 061 en REQUIREMENTS.
+
+
 ## Doel
 
 Een gebruiker kan vanaf elke pc op het privé-Tailscale-adres een Fluvius-CSV uploaden. De Raspberry Pi verwerkt de CSV en maakt het Energiepaspoort en het batterij-dagrapport centraal beschikbaar voor alle apparaten binnen de Tailscale-toegang.

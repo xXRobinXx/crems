@@ -1,5 +1,10 @@
 # Volledige audit — 24 september 2026
 
+## Actualisering — 1 oktober 2026 / Task 061
+
+Historische audit van september. De eerdere installatie-/toolontbrekingen hieronder zijn vervangen door Task 061: Supervisor bevestigt op 1 oktober 0.1.13 started en Ingress-HTTP via Tailscale slaagt. Directe LAN-/browser-/herstart-/rollbackgates blijven open. Oudere bevindingen blijven gedateerd bewijs, geen huidige deploymentstatus.
+
+
 ## Follow-up audit — 25 september 2026
 
 De onderstaande oorspronkelijke bevindingen zijn historische momentopnamen en door latere taken hersteld. De Astra-agent zelf kon door een usage-limiet niet afronden; een aparte read-only agent (`/root/pi_api_audit`, exact onderliggend model niet zichtbaar in de agentruntime) deed de vervolgaudit en hercontrole. Die agent vond vijf extra punten: HA Ingress absolute asset/API-paden, ontbrekende server-side Supervisor-peerrestrictie, onvolledige meetkwaliteit niet zichtbaar in de UI, een lege-response die een gelijktijdige opslagfout overschreef en in de laatste review een genormaliseerd API-pad dat niet aan de routehandlers werd doorgegeven. Root heeft ieder punt geverifieerd en in Task 054 gecorrigeerd; de laatste read-only hercontrole vond geen concrete codebevindingen.

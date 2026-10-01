@@ -1,6 +1,8 @@
 # CREMS Home Assistant-release
 
-Gebruik op Windows vanuit een schone `main`-checkout:
+De voorbeelden hieronder beschrijven de bestaande 0.1.13-release. Die tag bestaat al; een nieuwe run zonder `-ResumePublishedRelease` weigert daarom publicatie. De aanvullende opslag-/meterpollreparaties van Task 061 wijzigen productiecode en kunnen **niet** met een 0.1.13-resume worden uitgerold. Daarvoor zijn een nieuwe consistente manifestversie, een nieuwe onveranderlijke tag/image en actuele volledige review-/browsergates vereist. Geen tag overschrijven of gate omzeilen.
+
+Historisch voorbeeld op Windows vanuit een schone `main`-checkout:
 
 ```powershell
 .\tools\release-crems.ps1 -Version 0.1.13 -InstallPi -HomeAssistantUrl http://homeassistant.tail582404.ts.net:8123

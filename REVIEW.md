@@ -1,5 +1,11 @@
 # Review
 
+## Task 061 — Finale aanvullende backendreview — CODE APPROVED / UITROL CHANGES REQUIRED
+
+De begrensde centrale-opslag- en meterpollreparaties zijn door Agent A onafhankelijk gereviewd; geen concrete codeblocker gevonden. Zes bewezen herstelgebieden: malformed nested entries, financiële validatorpariteit, dag/DST/gap/energiebalanspariteit, oversized PUT413, singleflight-meterreads/herstel, gecombineerde storelimiet vóór write. Finale full harness PASS: core 65/65, bridge 110/110, web 134/134, harness 5/5; build/typecheck PASS; helpertests apart 6/6. Stabiele fingerprint `8f0b825dc5e66b3eea002005ef2de6bc23069ed3de6234011e52b17db55c86d8`. De vorige hieronder gedateerde counts beschrijven de eerste auditronde.
+
+Code/test/docs APPROVED betreft uitsluitend deze gereviewde wijzigingen. Gepubliceerde image en geverifieerde Pi blijven 0.1.13; de nieuwe fixes zijn niet uitgerold. Volledige gebruikersrelease blijft CHANGES REQUIRED: directe LAN, actuele Agent C-browser-PASS, privacycopy, herstart/rollback blijven open. Geen nieuwe attestatie of omzeiling van de releasegate. Root handelt de expliciet geautoriseerde Git-commit/push af. Zie `docs/task-061-review.md`.
+
 ## Task 061 — Wijzigingen APPROVED / gebruikersrelease CHANGES REQUIRED
 
 Agent A heeft de bestaande documentatie en releasehelper read-only beoordeeld en de actuele baseline bijgewerkt. Supervisor-info van 1 oktober bevestigt CREMS Energie 0.1.13, nieuwste versie 0.1.13 en started. Geen update of nieuwe backup in deze run. Pi-LAN-adres 192.168.88.253 is uit netwerkinfo vastgesteld. Direct LAN-HTTP vanaf de huidige host gaf timeout; Ingress-HTML/assets/health/current via Tailscale gaven HTTP 200 met passende cacheheaders. Core 65/65, web 134/134, bridge 101/101 vóór de nieuwe regressie, build/typecheck PASS; productie-start inclusief peerregressie 9/9, helper/harness 11/11 PASS. Agent A vindt geen concrete tool-/test-/docblocker en keurt deze wijzigingen goed. Finale full harness PASS: harness 5/5, core 65/65, bridge 102/102, web 134/134; build/typecheck exitcode 0; helpertests afzonderlijk 6/6 PASS. Fingerprint stabiel (`stable=true`): `05c451acd3857920e60b0e3f7f442c78bb58cc575e73fb5490468b2f3861ee0a`. Agent C-browsergate is NOT RUN en volledige Pi-releasegoedkeuring blijft open. Gedateerde reviews hieronder blijven historisch bewijs. Zie `docs/task-061-review.md`.

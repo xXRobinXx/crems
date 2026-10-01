@@ -1,6 +1,6 @@
 # CREMS Energie voor Home Assistant OS
 
-Deze app draait de CREMS-webinterface en bridge samen op poort 8099. De bridge gebruikt de door Home Assistant verstrekte Supervisor-token uitsluitend voor read-only REST-aanvragen; de token wordt niet naar de browser gestuurd.
+Deze app draait de CREMS-webinterface en bridge samen op interne poort 8099, uitsluitend bereikbaar via geauthenticeerde Home Assistant Ingress; er is geen rechtstreeks gepubliceerde add-onpoort. De bridge gebruikt de door Home Assistant verstrekte Supervisor-token uitsluitend voor read-only REST-aanvragen; de token wordt niet naar de browser gestuurd.
 
 De Docker-buildcontext moet de hoofdmap van de CREMS-repository zijn:
 

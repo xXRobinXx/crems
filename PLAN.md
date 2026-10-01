@@ -1,5 +1,10 @@
 # Implementation Plan
 
+## Actualisering — 1 oktober 2026 / Task 061
+
+Historisch herstelplan: de taaknummers 036–038 hieronder zijn oude planlabels en mogen niet als actuele TASKS-identiteiten worden gebruikt. Task 061 is nu de enige actieve taak. Supervisor bevestigt geïnstalleerde CREMS 0.1.13 op 1 oktober; directe LAN-, volledige actuele browser-, herstart-/rollbackgates blijven open. REQUIREMENTS en TASKS zijn leidend.
+
+
 ## Objective
 
 Maak van de bestaande modules één betrouwbare lokale MVP. Nieuwe functies stoppen totdat de kernreis na refresh aantoonbaar intact blijft.

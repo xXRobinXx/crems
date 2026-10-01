@@ -238,6 +238,77 @@ test("Ingress-productieserver weigert echte HTTP-verzoeken van andere peers vÃ³Ã
   }
 });
 
+test("meterpolling laat trage HA-opvragen niet overlappen en herstelt na een mislukte opvraag", { timeout: 20_000 }, async () => {
+  const directory = await mkdtemp(resolve(tmpdir(), "crems-meter-poll-"));
+  let child: ReturnType<typeof spawn> | undefined;
+  let active = 0, maximum = 0, calls = 0;
+  const completions: number[] = [];
+  const upstream = createServer((request, response) => {
+    assert.equal(request.url, "/api/states");
+    assert.equal(request.headers.authorization, "Bearer synthetic-local-test");
+    const id = ++calls;
+    active += 1; maximum = Math.max(maximum, active);
+    setTimeout(() => {
+      active -= 1; completions.push(id);
+      if (id === 2) { response.writeHead(503).end(); return; }
+      response.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify([
+        { entity_id: "sensor.import_power", state: String(id * 100), attributes: { unit_of_measurement: "W" } },
+        { entity_id: "sensor.export_power", state: "0", attributes: { unit_of_measurement: "W" } },
+      ]));
+    }, id === 1 ? 2_500 : 50);
+  });
+  await new Promise<void>((resolve, reject) => { upstream.once("error", reject); upstream.listen(0, "127.0.0.1", resolve); });
+  const upstreamAddress = upstream.address(); assert.ok(upstreamAddress && typeof upstreamAddress === "object");
+  try {
+    await cp(resolve(bridgeDirectory, "dist"), resolve(directory, "bridge"), { recursive: true });
+    await mkdir(resolve(directory, "data"));
+    await writeFile(resolve(directory, "package.json"), '{"type":"module"}');
+    await writeFile(resolve(directory, "data/belpex-day-ahead-2021-09-01_2026-08-31.csv"), "start_utc,resolution_minutes,price_eur_mwh\n2026-01-01T00:00:00Z,15,10\n");
+    const reservation = createServer();
+    await new Promise<void>((resolve, reject) => { reservation.once("error", reject); reservation.listen(0, "127.0.0.1", resolve); });
+    const address = reservation.address(); assert.ok(address && typeof address === "object");
+    await new Promise<void>((resolve) => reservation.close(() => resolve()));
+    child = spawn(process.execPath, [resolve(directory, "bridge/server.js")], {
+      cwd: directory, windowsHide: true,
+      env: { SystemRoot: process.env.SystemRoot, PATH: process.env.PATH, CREMS_BRIDGE_HOST: "127.0.0.1", CREMS_BRIDGE_PORT: String(address.port), CREMS_DATA_DIR: resolve(directory, "runtime"), HASS_URL: `http://127.0.0.1:${upstreamAddress.port}`, HASS_TOKEN: "synthetic-local-test", HASS_IMPORT_POWER_ENTITY: "sensor.import_power", HASS_EXPORT_POWER_ENTITY: "sensor.export_power" },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const running = child;
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error("meter test startup timed out")), 8_000);
+      running.once("error", error => { clearTimeout(timeout); reject(error); });
+      running.once("exit", code => { clearTimeout(timeout); reject(new Error(`meter test exited: ${code}`)); });
+      running.stdout!.on("data", chunk => { if (String(chunk).includes("CREMS Bridge active")) { clearTimeout(timeout); resolve(); } });
+    });
+    const deadline = Date.now() + 6_200;
+    const measured: number[] = [];
+    let failedAfterMeasured = false, recovered = false;
+    while (Date.now() < deadline) {
+      const response = await fetch(`http://127.0.0.1:${address.port}/api/current`);
+      const reading = await response.json() as { quality: string; importPowerW: number };
+      if (reading.quality === "measured") {
+        if (failedAfterMeasured) recovered = true;
+        if (measured.at(-1) !== reading.importPowerW) measured.push(reading.importPowerW);
+      } else if (measured.length) failedAfterMeasured = true;
+      await new Promise<void>((resolve) => setTimeout(resolve, 60));
+    }
+    assert.equal(maximum, 1, "there is at most one upstream meter request");
+    assert.ok(calls >= 3, "polling continues after the failed second request");
+    assert.deepEqual(completions, [...completions].sort((a, b) => a - b));
+    assert.ok(measured.length >= 2);
+    assert.deepEqual(measured, [...measured].sort((a, b) => a - b), "older responses never overwrite newer readings");
+    assert.equal(failedAfterMeasured, true);
+    assert.equal(recovered, true);
+  } finally {
+    if (child && child.exitCode === null && child.signalCode === null) {
+      const stopped = new Promise<void>(resolve => child!.once("exit", () => resolve())); child.kill(); await stopped;
+    }
+    upstream.closeAllConnections();
+    await new Promise<void>((resolve) => upstream.close(() => resolve()));
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("houdt addonversies en ARM64-releaseworkflow synchroon", () => {
   const rootConfig = readFileSync(resolve(repositoryRoot, "crems/config.yaml"), "utf8");
   const addonConfig = readFileSync(resolve(repositoryRoot, "apps/home-assistant-addon/crems/config.yaml"), "utf8");

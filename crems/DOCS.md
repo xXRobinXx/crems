@@ -6,5 +6,5 @@ De app gebruikt de interne Home Assistant API read-only. De Supervisor-token bli
 
 De optionele entiteitsvelden mogen leeg blijven voor automatische detectie. Vul ze alleen in wanneer meerdere geschikte sensoren bestaan.
 
-De webinterface is beschikbaar op poort 8099. Zet **Start bij opstarten** en **Watchdog** aan nadat de eerste start geslaagd is.
+De webinterface opent uitsluitend via geauthenticeerde Home Assistant Ingress. Poort 8099 is intern en wordt niet rechtstreeks op het LAN gepubliceerd. Open op het Pi-thuisnetwerk Home Assistant op poort 8123 en kies CREMS Energie. Zet **Start bij opstarten** en **Watchdog** aan nadat de eerste start geslaagd is.
 

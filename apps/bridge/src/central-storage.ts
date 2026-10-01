@@ -1,5 +1,6 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { priceDayWindow } from "./price-day-window.js";
 
 export type CentralResultKey = "energy-profile" | "battery-report";
 const CAPACITIES = [3, 5, 7, 10, 13] as const;
@@ -8,6 +9,7 @@ const ENERGY_KEYS = ["version", "savedAt", "period", "measuredImportKwh", "estim
 const BATTERY_KEYS = ["version", "savedAt", "quality", "technical", "priceSource", "financial", "daily"];
 const RESULT_KEYS: readonly CentralResultKey[] = ["energy-profile", "battery-report"];
 const MAX_RESULTS_BYTES = 4 * 1024 * 1024;
+const brusselsDate = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Brussels", year: "numeric", month: "2-digit", day: "2-digit" });
 type AnyObject = Record<string, any>;
 
 const object = (value: unknown): value is AnyObject => !!value && typeof value === "object" && !Array.isArray(value);
@@ -15,7 +17,6 @@ const exact = (value: AnyObject, keys: readonly string[]) => Object.keys(value).
 const finite = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
 const nonNegative = (value: unknown): value is number => finite(value) && value >= 0;
 const rounded = (value: number) => Math.round(value * 100) / 100;
-const close = (a: number, b: unknown) => typeof b === "number" && Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b));
 const date = (value: unknown) => typeof value === "string" && Number.isFinite(Date.parse(value));
 const validPeriod = (value: unknown) => object(value) && exact(value, ["start", "end"]) && date(value.start) && date(value.end) && Date.parse(value.end) > Date.parse(value.start);
 
@@ -32,6 +33,7 @@ const validQuality = (value: unknown) => {
 };
 
 const validTechnical = (value: unknown) => Array.isArray(value) && value.length === 5 && value.every((item, index) => {
+  if (!object(item)) return false;
   const v = item as AnyObject;
   const optional = v.wholesaleTimeShiftValueEur === undefined ? [] : ["wholesaleTimeShiftValueEur"];
   return object(item) && exact(v, ["capacityKwh", "powerKw", "shiftedKwh", "chargedFromExportKwh", "endingStoredKwh", "lossesKwh", "equivalentCycles", ...optional]) && v.capacityKwh === CAPACITIES[index] && v.powerKw === v.capacityKwh / 2 && [v.shiftedKwh, v.chargedFromExportKwh, v.endingStoredKwh, v.lossesKwh, v.equivalentCycles].every(nonNegative) && (v.wholesaleTimeShiftValueEur === undefined || finite(v.wholesaleTimeShiftValueEur));
@@ -40,23 +42,36 @@ const validTechnical = (value: unknown) => Array.isArray(value) && value.length 
 const validDaily = (value: unknown, quality: AnyObject, technical: any[]) => {
   if (!Array.isArray(value) || value.length < 1 || value.length > 4_000 || !Array.isArray(technical)) return false;
   let previous = "";
+  let previousEnd: number | undefined;
+  const balanced = (a: number, b: number) => Math.abs(a - b) <= 1e-7 * Math.max(1, Math.abs(a), Math.abs(b));
   const totals = CAPACITIES.map(() => ({ charged: 0, discharged: 0, loss: 0, end: 0 }));
   for (const item of value) {
     const day = item as AnyObject;
     if (!object(item) || !exact(day, ["day", "first", "last", "count", "estimatedCount", "gapCount", "candidates"]) || typeof day.day !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(day.day) || day.day <= previous || !date(day.first) || !date(day.last) || Date.parse(day.first) >= Date.parse(day.last) || Date.parse(day.first) < Date.parse(quality.period.start) || Date.parse(day.last) > Date.parse(quality.period.end) || !Number.isInteger(day.count) || day.count < 1 || day.count > 100 || !Number.isInteger(day.estimatedCount) || !Number.isInteger(day.gapCount) || day.estimatedCount < 0 || day.gapCount < 0 || !Array.isArray(day.candidates) || day.candidates.length !== 5) return false;
+    const calendar = new Date(`${day.day}T12:00:00Z`);
+    if (!Number.isFinite(calendar.getTime()) || calendar.toISOString().slice(0, 10) !== day.day || brusselsDate.format(new Date(day.first)) !== day.day || brusselsDate.format(new Date(Date.parse(day.last) - 1)) !== day.day) return false;
+    const window = priceDayWindow("today", calendar);
+    const span = Date.parse(day.last) - Date.parse(day.first);
+    if (day.count > (Date.parse(window.end) - Date.parse(window.start)) / 900_000 || day.estimatedCount > day.count || day.gapCount > day.count || day.count * 900_000 > span) return false;
+    if ((day.count * 900_000 < span || (previousEnd !== undefined && Date.parse(day.first) > previousEnd)) && day.gapCount === 0) return false;
     for (let index = 0; index < 5; index += 1) {
       const candidate = day.candidates[index] as AnyObject;
-      if (!object(candidate) || !exact(candidate, ["capacityKwh", "startStoredKwh", "endStoredKwh", ...ENERGY_FIELDS]) || candidate.capacityKwh !== CAPACITIES[index] || ![candidate.startStoredKwh, candidate.endStoredKwh, ...ENERGY_FIELDS.map((field) => candidate[field])].every(nonNegative) || candidate.startStoredKwh > candidate.capacityKwh || candidate.endStoredKwh > candidate.capacityKwh) return false;
+      if (!object(candidate) || !exact(candidate, ["capacityKwh", "startStoredKwh", "endStoredKwh", ...ENERGY_FIELDS]) || candidate.capacityKwh !== CAPACITIES[index] || ![candidate.startStoredKwh, candidate.endStoredKwh, ...ENERGY_FIELDS.map((field) => candidate[field])].every(nonNegative) || candidate.startStoredKwh > candidate.capacityKwh + 1e-7 || candidate.endStoredKwh > candidate.capacityKwh + 1e-7) return false;
+      const factor = Math.sqrt(.9);
+      if (!balanced(candidate.conversionLossKwh, candidate.chargedKwh * (1 - factor) + candidate.dischargedKwh * (1 / factor - 1)) || (candidate.resetLossKwh > 1e-7 && day.gapCount === 0)) return false;
+      if (!balanced(candidate.startStoredKwh, totals[index]!.end) || !balanced(candidate.startStoredKwh + candidate.chargedKwh - candidate.dischargedKwh - candidate.conversionLossKwh - candidate.resetLossKwh, candidate.endStoredKwh) || !balanced(candidate.netImportBeforeKwh - candidate.dischargedKwh, candidate.netImportAfterKwh) || !balanced(candidate.netExportBeforeKwh - candidate.chargedKwh, candidate.netExportAfterKwh) || candidate.netImportBeforeKwh > candidate.sourceImportKwh + 1e-7 || candidate.netExportBeforeKwh > candidate.sourceExportKwh + 1e-7 || !balanced(candidate.sourceImportKwh - candidate.sourceExportKwh, candidate.netImportBeforeKwh - candidate.netExportBeforeKwh)) return false;
+      if (index > 0 && ["sourceImportKwh", "sourceExportKwh", "netImportBeforeKwh", "netExportBeforeKwh"].some((field) => !balanced(candidate[field], day.candidates[0][field]))) return false;
       totals[index]!.charged += candidate.chargedKwh;
       totals[index]!.discharged += candidate.dischargedKwh;
       totals[index]!.loss += candidate.conversionLossKwh + candidate.resetLossKwh;
       totals[index]!.end = candidate.endStoredKwh;
     }
     previous = day.day;
+    previousEnd = Date.parse(day.last);
   }
   return totals.every((total, index) => {
     const technicalItem = technical[index] as AnyObject;
-    const close = (a: number, b: unknown) => typeof b === "number" && Math.abs(a - b) <= 1e-6 * Math.max(1, Math.abs(a), Math.abs(b));
+    const close = (a: number, b: unknown) => typeof b === "number" && balanced(a, b);
     return close(total.charged, technicalItem.chargedFromExportKwh) && close(total.discharged, technicalItem.shiftedKwh) && close(total.loss, technicalItem.lossesKwh) && close(total.end, technicalItem.endingStoredKwh);
   });
 };
@@ -65,6 +80,7 @@ const validFinancial = (value: unknown, quality: AnyObject, technical: any[]) =>
   const v = value as AnyObject;
   if (!object(value) || !exact(v, ["assumptions", "results", "recommendedCapacityKwh"]) || !object(v.assumptions) || !Array.isArray(v.results) || v.results.length !== 5) return false;
   const a = v.assumptions as AnyObject;
+  if (typeof a.contractName !== "string" || a.contractName.length > 200 || typeof a.quoteSource !== "string" || a.quoteSource.length > 200) return false;
   if (!exact(a, ["confirmed", "importRateCtKwh", "exportRateCtKwh", "lifeYears", "annualDegradationPercent", "discountRatePercent", "investmentsEur", "contractName", "contractType", "effectiveStart", "effectiveEnd", "quoteSource", "quoteDate", "warrantyYears", "pricesIncludeVat"]) || a.confirmed !== true || a.pricesIncludeVat !== true || typeof a.contractName !== "string" || a.contractName.trim() === "" || typeof a.quoteSource !== "string" || a.quoteSource.trim() === "" || (a.contractType !== "fixed" && a.contractType !== "variable") || !date(a.effectiveStart) || !date(a.effectiveEnd) || Date.parse(a.effectiveEnd) <= Date.parse(a.effectiveStart) || !date(a.quoteDate) || !Number.isInteger(a.lifeYears) || a.lifeYears < 1 || a.lifeYears > 30 || !Number.isInteger(a.warrantyYears) || a.warrantyYears < 1 || a.warrantyYears > 30 || ![a.importRateCtKwh, a.exportRateCtKwh, a.annualDegradationPercent, a.discountRatePercent].every(nonNegative) || a.annualDegradationPercent >= 100 || a.discountRatePercent >= 100 || !object(a.investmentsEur) || !exact(a.investmentsEur, CAPACITIES.map(String)) || !CAPACITIES.every((capacity) => nonNegative(a.investmentsEur[String(capacity)]) && a.investmentsEur[String(capacity)] > 0)) return false;
   if (!validQuality(quality) || !Array.isArray(technical) || !quality.integrityReliable || quality.estimatedCount !== 0 || quality.gapCount !== 0 || quality.duplicateCount !== 0 || quality.overlapCount !== 0 || Date.parse(quality.period.end) - Date.parse(quality.period.start) < 365 * 86_400_000 || Date.parse(a.effectiveStart) > Date.parse(quality.period.start) || Date.parse(a.effectiveEnd) < Date.parse(quality.period.end)) return false;
   const years = (Date.parse(quality.period.end) - Date.parse(quality.period.start)) / (365.2425 * 86_400_000);
@@ -92,18 +108,20 @@ const validFinancial = (value: unknown, quality: AnyObject, technical: any[]) =>
     return { annualEnergySavingEur: rounded(annualSaving), low: expectedScenario(annualSaving, investment, .8), base: expectedScenario(annualSaving, investment, 1), high: expectedScenario(annualSaving, investment, 1.2) };
   });
   if (expected.some((item) => item === undefined)) return false;
-  const ranked = [...v.results].sort((left: AnyObject, right: AnyObject) => Number(right.base.npvEur) - Number(left.base.npvEur) || Number(left.capacityKwh) - Number(right.capacityKwh));
-  const expectedRecommendation = ranked[0]!.base.npvEur > 0 ? ranked[0]!.capacityKwh : null;
-  return v.results.every((item: unknown, index: number) => {
+  const validResults = v.results.every((item: unknown, index: number) => {
     const result = item as AnyObject;
     const calculated = expected[index]!;
-    if (!object(item) || !exact(result, ["capacityKwh", "investmentEur", "annualEnergySavingEur", "low", "base", "high"]) || result.capacityKwh !== CAPACITIES[index] || result.investmentEur !== a.investmentsEur[String(result.capacityKwh)] || !close(calculated.annualEnergySavingEur, result.annualEnergySavingEur)) return false;
+    if (!object(item) || !exact(result, ["capacityKwh", "investmentEur", "annualEnergySavingEur", "low", "base", "high"]) || result.capacityKwh !== CAPACITIES[index] || result.investmentEur !== a.investmentsEur[String(result.capacityKwh)] || !finite(result.annualEnergySavingEur) || calculated.annualEnergySavingEur !== result.annualEnergySavingEur) return false;
     return [result.low, result.base, result.high].every((scenario: unknown, scenarioIndex: number) => {
       const s = scenario as AnyObject;
       const calculatedScenario = calculated[["low", "base", "high"][scenarioIndex] as "low" | "base" | "high"];
-      return object(scenario) && exact(s, ["annualFactor", "cashflowsEur", "npvEur", "paybackYears"]) && s.annualFactor === calculatedScenario.annualFactor && Array.isArray(s.cashflowsEur) && s.cashflowsEur.length === a.lifeYears && s.cashflowsEur.every((cashflow: unknown, cashflowIndex: number) => close(calculatedScenario.cashflowsEur[cashflowIndex]!, cashflow)) && close(calculatedScenario.npvEur, s.npvEur) && (calculatedScenario.paybackYears === null ? s.paybackYears === null : close(calculatedScenario.paybackYears, s.paybackYears));
+      return object(scenario) && exact(s, ["annualFactor", "cashflowsEur", "npvEur", "paybackYears"]) && s.annualFactor === calculatedScenario.annualFactor && Array.isArray(s.cashflowsEur) && s.cashflowsEur.length === a.lifeYears && s.cashflowsEur.every((cashflow: unknown, cashflowIndex: number) => finite(cashflow) && calculatedScenario.cashflowsEur[cashflowIndex]! === cashflow) && finite(s.npvEur) && calculatedScenario.npvEur === s.npvEur && (calculatedScenario.paybackYears === null ? s.paybackYears === null : nonNegative(s.paybackYears) && calculatedScenario.paybackYears === s.paybackYears);
     });
-  }) && v.recommendedCapacityKwh === expectedRecommendation;
+  });
+  if (!validResults) return false;
+  const ranked = [...v.results].sort((left: AnyObject, right: AnyObject) => Number(right.base.npvEur) - Number(left.base.npvEur) || Number(left.capacityKwh) - Number(right.capacityKwh));
+  const expectedRecommendation = ranked[0]!.base.npvEur > 0 ? ranked[0]!.capacityKwh : null;
+  return v.recommendedCapacityKwh === expectedRecommendation;
 };
 
 export const validateCentralResult = (key: CentralResultKey, value: unknown): boolean => {
@@ -148,9 +166,11 @@ export class CentralStorage {
     return result;
   }
   private async write(value: StoredResults) {
+    const serialized = JSON.stringify(value);
+    if (Buffer.byteLength(serialized, "utf8") > MAX_RESULTS_BYTES) throw new StorageValidationError();
     await mkdir(this.directory, { recursive: true });
     const temporary = `${this.file}.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`;
-    await writeFile(temporary, JSON.stringify(value), { encoding: "utf8", mode: 0o600 });
+    await writeFile(temporary, serialized, { encoding: "utf8", mode: 0o600 });
     await rename(temporary, this.file);
   }
 }

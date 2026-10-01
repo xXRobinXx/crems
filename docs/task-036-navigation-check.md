@@ -1,5 +1,10 @@
 # Task 036 — navigatievoorwaarden
 
+## Actualisering — 1 oktober 2026 / Task 061
+
+Historische navigatiecheck. Task 060 vervangt uitsluitend de oude voorwaarde dat Contract een bewaard Energiepaspoort nodig heeft: Contract opent nu vanuit schoon profiel. De overige scenario's blijven historisch bewijs/open checklist, geen actuele browser-PASS.
+
+
 Status: READY FOR BROWSER REVIEW. Geen browser-PASS of formele APPROVED-review.
 
 ## Codehercontrole — 13 september 2026

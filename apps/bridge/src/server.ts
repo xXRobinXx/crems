@@ -123,13 +123,18 @@ const server = createServer((request, response) => {
   return json(response, 404, { error: "not_found" });
 });
 
+let meterReadInFlight = false;
 setInterval(async () => {
+  if (meterReadInFlight) return;
+  meterReadInFlight = true;
   try {
     latest = await source.read();
     lastError = undefined;
   } catch (error) {
     lastError = error instanceof Error ? error.message : "Onbekende meetfout";
     latest = { ...latest, timestamp: new Date().toISOString(), quality: "incomplete" };
+  } finally {
+    meterReadInFlight = false;
   }
   const event = `data: ${JSON.stringify(latest)}\n\n`;
   for (const client of clients) client.write(event);

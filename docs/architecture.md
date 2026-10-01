@@ -2,7 +2,7 @@
 
 De eerste verticale slice bestaat uit drie workspaces:
 
-- `apps/web`: zelfstandige React/PWA-interface.
+- `apps/web`: zelfstandige React-webinterface.
 - `apps/bridge`: lokaal proces dat één meterbron leest en data via HTTP/SSE aanbiedt.
 - `packages/core`: gedeelde types en pure berekeningsfuncties.
 
