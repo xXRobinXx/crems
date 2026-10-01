@@ -194,6 +194,50 @@ test("echte productie-HTTP responses cachen uitsluitend bestaande gehashte asset
   }
 });
 
+test("Ingress-productieserver weigert echte HTTP-verzoeken van andere peers vóór assets en opslag", { timeout: 20_000 }, async () => {
+  const directory = await mkdtemp(resolve(tmpdir(), "crems-peer-test-"));
+  let child: ReturnType<typeof spawn> | undefined;
+  try {
+    await cp(resolve(bridgeDirectory, "dist"), resolve(directory, "bridge"), { recursive: true });
+    await mkdir(resolve(directory, "data"));
+    await writeFile(resolve(directory, "package.json"), '{"type":"module"}');
+    await writeFile(resolve(directory, "data/belpex-day-ahead-2021-09-01_2026-08-31.csv"), "start_utc,resolution_minutes,price_eur_mwh\n2026-01-01T00:00:00Z,15,10\n");
+    const reservation = createServer();
+    await new Promise<void>((resolve, reject) => { reservation.once("error", reject); reservation.listen(0, "127.0.0.1", resolve); });
+    const address = reservation.address();
+    assert.ok(address && typeof address === "object");
+    await new Promise<void>((resolve, reject) => reservation.close(error => error ? reject(error) : resolve()));
+    child = spawn(process.execPath, [resolve(directory, "bridge/server.js")], {
+      cwd: directory, windowsHide: true,
+      env: { SystemRoot: process.env.SystemRoot, PATH: process.env.PATH, CREMS_BRIDGE_HOST: "127.0.0.1", CREMS_BRIDGE_PORT: String(address.port), CREMS_REQUIRE_INGRESS_PEER: "true", CREMS_DATA_DIR: resolve(directory, "runtime") },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const running = child;
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error("peer test startup timed out")), 8_000);
+      running.once("error", error => { clearTimeout(timeout); reject(error); });
+      running.once("exit", code => { clearTimeout(timeout); reject(new Error(`peer test exited: ${code}`)); });
+      running.stdout!.on("data", chunk => { if (String(chunk).includes("CREMS Bridge active")) { clearTimeout(timeout); resolve(); } });
+    });
+    for (const prefix of ["/", "/api/hassio_ingress/test-session/"]) {
+      for (const [method, path] of [["GET", ""], ["GET", "assets/app.js"], ["GET", "api/current"], ["GET", "api/stream"], ["PUT", "api/results/energy-profile"], ["DELETE", "api/results/battery-report"]]) {
+        const response = await fetch(`http://127.0.0.1:${address.port}${prefix}${path}`, { method, headers: { "X-Forwarded-For": "172.30.32.2", "Origin": "https://untrusted.test" }, ...(method === "PUT" ? { body: "{}" } : {}) });
+        assert.equal(response.status, 403, `${method} ${prefix}${path}`);
+        assert.equal(response.headers.get("cache-control"), "no-store");
+        assert.equal(response.headers.get("access-control-allow-origin"), null);
+        assert.deepEqual(await response.json(), { error: "ingress_only" });
+      }
+    }
+    assert.equal(existsSync(resolve(directory, "runtime/energy-profile.json")), false);
+  } finally {
+    if (child && child.exitCode === null && child.signalCode === null) {
+      const stopped = new Promise<void>(resolve => child!.once("exit", () => resolve()));
+      child.kill(); await stopped;
+    }
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("houdt addonversies en ARM64-releaseworkflow synchroon", () => {
   const rootConfig = readFileSync(resolve(repositoryRoot, "crems/config.yaml"), "utf8");
   const addonConfig = readFileSync(resolve(repositoryRoot, "apps/home-assistant-addon/crems/config.yaml"), "utf8");

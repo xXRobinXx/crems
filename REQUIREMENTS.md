@@ -67,6 +67,7 @@ Een zelfstandige, gebruiksvriendelijke energie-app voor Belgische huishoudens di
 |---|---|
 | Module bewezen | read-only Home Assistant live data, daghistory, echte prijsreeks, streaming Fluvius-controle, veilige profielaggregaten en pure batterij-/contractberekeningen |
 | Beschikbaar in lokale webapp | expliciet Energiepaspoort v2, duurzaam batterijrapport v3 en persoonlijke vergelijking van twee zelf ingevoerde vaste/variabele energiecomponenten |
-| Niet vrijgegeven | automatische marktbrede contractkeuze, bewaarde contractvergelijking, volledige financiële offerte en Raspberry Pi-deployment |
+| Beperkt deploymentbewijs | Home Assistant-add-on 0.1.13 draait volgens actuele Supervisor-info van 1 oktober; actuele Pi-browser-/LAN-gates in Task 061 open |
+| Niet vrijgegeven | live marktbrede contractkeuze zonder partnerrechten/configuratie, bewaarde contractvergelijking en volledige financiële offerte |
 
 Een modulegoedkeuring is geen eindgebruikersrelease. Zichtbare functionaliteit is pas vrijgegeven na een volledige browsergate van de gebruikersreis.

@@ -106,8 +106,9 @@ Op expliciete gebruikersopdracht wordt het bestaande rapport aangevuld met optio
 ## Known Risks / Technical Debt
 
 - Home Assistant wordt momenteel elke seconde via `/api/states` gepolld; een websocket/subscription-adapter is efficiënter.
-- Tests ontbreken voor sensorselectie, eenheden, API-fouten en kostenberekeningen. De eerste afgebakende testtaak dekt alleen de pure vlakke intervalkost.
+- Sensorselectie, eenheden, API-fouten en kostenberekeningen hebben regressietests. Automatische tests bewijzen geen volledige actuele Pi-gebruikersreis.
 - De overzichtsgrafiek gebruikt de echte historyketen uit Tasks 019–027; oude no-price-criteria uit Task 021 zijn door de echte gele prijsreeks van Task 027 vervangen.
-- Het project heeft in deze workspace nog geen Git-repository voor echte diff-based review.
+- De workspace is een Git-repository; releasecontrole gebruikt diffs, onveranderlijke tags en ARM64-images. Runtime-, reboot- en rollbackbewijs blijft afzonderlijk vereist.
+- Home Assistant-deployment gebruikt geauthenticeerde Ingress, relatieve frontendroutes en server-side uitsluitend peer `172.30.32.2`. LAN-toegang loopt via Home Assistant op poort 8123; de bridgepoort 8099 wordt niet rechtstreeks gepubliceerd. Zie het goedgekeurde deploymentontwerp in `docs/task-037-haos-app.md`.
 
 Zie ook `docs/architecture.md` voor de oorspronkelijke verticale-slice-notities.

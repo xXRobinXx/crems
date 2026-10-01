@@ -1,4 +1,12 @@
-# CREMS Product Audit — 7 september 2026
+# CREMS Product Audit
+
+## Actuele releasebaseline — 1 oktober 2026
+
+Task 061 controleert de bestaande release, documentatie en LAN-toegang. Een actuele geauthenticeerde Supervisor-infoaanvraag bevestigt CREMS Energie **0.1.13**, nieuwste versie **0.1.13**, toestand **started**. Deze run voerde geen update uit en maakte of controleerde geen nieuwe appbackup. De publicatiegegevens van 29 september hieronder blijven de herkomst van de bestaande image.
+
+Het deploymentontwerp gebruikt uitsluitend geauthenticeerde Home Assistant Ingress: LAN-toegang via Home Assistant op poort 8123, interne add-onpoort 8099 en server-side peer `172.30.32.2`. Read-only Pi-netwerkinfo bevestigt `192.168.88.253/24`, gateway `192.168.88.1`. De directe LAN-HTTP-controle vanaf de huidige host gaf timeout; HA en geauthenticeerde Ingress via Tailscale gaven HTTP 200. De LAN-route is [CREMS Energie](http://192.168.88.253:8123/hassio/ingress/350f0e24_crems_energy); rechtstreekse bereikbaarheid is hier niet bewezen. Actuele core 65/65, web 134/134, bridge 101/101 vóór de nieuwe peerregressie, build/typecheck, productie-start 9/9 en helper/harness 11/11 zijn PASS. Finale root-harness na docs volgt. De tool-/test-/docwijzigingen zijn APPROVED; Task 061 blijft CHANGES REQUIRED. Agent C-browsergate is NOT RUN. Volledige Pi-browser-, opslag-/herstart-, cache- en rollbackgates blijven open. Er is geen volledige releasegoedkeuring en geen nieuwe productfunctie of providerrequest.
+
+De secties hieronder zijn gedateerd historisch bewijs. Open codepunten uit september zijn niet automatisch actuele blockers; huidige status en controleerbare beperkingen staan in Task 061 en `docs/task-061-review.md`.
 
 ## Contract-API actualisering — 28 september 2026
 
@@ -12,15 +20,15 @@ Task 060 voegt lokaal gecontroleerde Fluvius-CSV-totalen per dag-/nachtregister 
 
 CREMS Energy `v0.1.12` is de laatst geverifieerde geïnstalleerde versie op de gekoppelde Home Assistant-Pi. De ongeconfigureerde `v0.1.13` ARM64-image is gepubliceerd via workflow [36600366405](https://github.com/xXRobinXx/crems/actions/runs/36600366405), OCI-index `sha256:bd8000e778e61b94ac5a312b2f546e67e4943aa5a8adb9779858283e0ddc5add`, ARM64 `sha256:39c2ce281cbb8198ce6be876e8f44a1bf27ad82a94b02a89e8adb7d45925fccd`. Pi-installatie wacht op veilige lokale HA-tokeninvoer; de Supervisor-update maakt vooraf een appback-up. De Ingress en contractpagina waren eerder bereikbaar op 0.1.12. De eerdere live bridgewaarnemingen van 27 september zijn historisch; exacte Pi-viewports, cacheheaders/overdracht en browserconsole zijn niet uitgevoerd wegens ontbrekende browserbediening. Lokale viewport- en bridgecachetests zijn geen Pi-bewijs. Zie `TASKS.md` en `REVIEW.md`.
 
-Contractbrononderzoek: de Vlaamse Nutsregulator biedt maandelijks V-test-productdata als downloadbestand met open-datahergebruik onder bronvermelding; prijzen zijn exclusief btw en nettarieven/heffingen ontbreken. Dit is geen API en geen landelijke bron. Voor Brussel en Wallonië is in de geraadpleegde officiële documentatie geen publiek contract-API/schema of vergelijkbaar herbruikbaar bestand vastgesteld. Automatische contractintegratie blijft daarom niet geïmplementeerd; geen verborgen endpoints gebruikt. Zie Task 053/044.
+Contractbrononderzoek: de Vlaamse Nutsregulator biedt maandelijks V-test-productdata als downloadbestand met open-datahergebruik onder bronvermelding; prijzen zijn exclusief btw en nettarieven/heffingen ontbreken. Dit is geen API en geen landelijke bron. Voor Brussel en Wallonië is in de geraadpleegde officiële documentatie geen publiek contract-API/schema of vergelijkbaar herbruikbaar bestand vastgesteld. Een brede live contractbron was toen niet bewezen; Task 059 voegde later de optionele Aanbieders.be-connector toe. Live gebruik blijft afhankelijk van partnerrechten en configuratie; geen verborgen endpoints gebruikt. Zie Task 053/044/059.
 
 De volledige Astra-audit is niet afgerond: de eerdere agent-run stopte wegens een usage-limiet. De bestaande read-only bevindingen zijn handmatig getoetst, maar dat vervangt de gevraagde onafhankelijke Astra-review niet. Task 042 blijft dus gedeeltelijk.
 
-## Actuele releasebaseline — 25 september 2026
+## Historische releasebaseline — 25 september 2026
 
 De volledige update van de audit staat bovenaan [docs/full-audit-2026-09-24.md](docs/full-audit-2026-09-24.md). De P1-codebevindingen over centrale corrupte opslag, data-allowlists, foutieve kwaliteit, browserkopieën, wildcard CORS en HA Ingress-routing zijn hersteld met regressies. De geverifieerde codechecks zijn groen. De release is desondanks **niet uitgerold of volledig goedgekeurd**: Agent C-browser-PASS, ARM64-publicatie/installatie en Pi-herstart/rollback ontbreken; contracten-API-toegang blijft onbekend. `TASKS.md` bevat de externe gates.
 
-## Nieuwe volledige audit — 24 september 2026
+## Historische volledige audit — 24 september 2026
 
 De audit van de huidige werkboom staat in [docs/full-audit-2026-09-24.md](docs/full-audit-2026-09-24.md). De onafhankelijke Astra-controle werd door een usage-limiet onderbroken; de concrete bevindingen zijn daarna tegen de code geverifieerd. De automatische controles zijn groen: build, 65 core-tests, 118 webtests, bridgetests, typechecks en harness. De release blijft geblokkeerd door open P1-bevindingen rond corrupte centrale opslag, ontbrekende origin/hostauthenticatie, bronkwaliteitsclaims en financiële snapshotvalidatie. Er is geen Agent C-browser-PASS; historische moduleclaims zijn geen releasegoedkeuring.
 
@@ -30,7 +38,7 @@ De audit hieronder is de historische herstelbaseline van 7 september. De persoon
 
 Task 035 blijft actief. De eindcontrole vond aanvullende fouten in expliciete rapportopslag zonder prijzen, de scheiding tussen nieuwe CSV-data en een bestaand rapport, en het opnieuw openen van resultaten. De gerichte herstelhandoff staat in `TASKS.md`; het bewijs en de uiteindelijke beslissing komen in `REVIEW.md`. De open browserchecklist staat in `docs/task-035-release-check.md`. Contractuitbreiding en Raspberry Pi-deployment volgen pas na de herstelrelease.
 
-## Oordeel
+## Historisch oordeel — 7 september 2026
 
 CREMS is een bruikbare technische basis, maar nog geen betrouwbare lokale MVP. De live Home Assistant-keten, daggrafiek, prijsweergave, streaming Fluvius-parser, Energiepaspoort-aggregaten en batterijmotor bestaan. De volledige gebruikersreis is echter niet als één product bewezen.
 
@@ -75,3 +83,5 @@ Geen nieuwe productfunctie vóór de herstelrelease. Eerst wordt exact één ver
 `CSV controleren → technisch batterijresultaat → financiële context bevestigen → volledig rapport bewaren → refresh → hetzelfde rapport herstellen → expliciet verwijderen`.
 
 Contractvergelijking volgt pas nadat deze flow is goedgekeurd. Historische taakgoedkeuring blijft geldig als modulebewijs, maar geldt niet automatisch als releasegoedkeuring.
+
+Actuele netwerkbevinding Task 061 (1 oktober): de huidige pc heeft Wi-Fi-adres `192.168.0.243/24`, gateway `192.168.0.1`; de Pi heeft `192.168.88.253/24`, gateway `192.168.88.1`. Ze zitten in verschillende IPv4-subnets. De directe timeout past bij ontbrekende routering tussen deze netwerken; de routerconfiguratie is niet gecontroleerd of gewijzigd. De pc moet toegang krijgen tot het Pi-subnet (bijvoorbeeld hetzelfde niet-geïsoleerde thuisnetwerk) of een bestaande route gebruiken. De tijdens deze run werkende toegang gebruikt [Home Assistant via Tailscale](http://homeassistant.tail582404.ts.net:8123/hassio/ingress/350f0e24_crems_energy). Er is geen bewijs dat een willekeurig apparaat op het Pi-subnet niet kan verbinden.

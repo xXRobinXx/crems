@@ -2,6 +2,22 @@
 
 ## Current Task
 
+### Task 061 — Operationele audit, release afronden en LAN-toegang — 1 oktober 2026
+
+**Status:** CHANGES REQUIRED — tool-/test-/documentatiewijzigingen APPROVED; Supervisor-versie en Ingress-HTTP geverifieerd. Directe LAN-bereikbaarheid en actuele browsergate blijven open (NOT RUN). Task 060 is historisch APPROVED, geen tweede actieve implementatietaak.
+
+Doel: de bestaande ongeconfigureerde release 0.1.13 controleren, veilig op Home Assistant bijwerken en toegang vanaf het thuisnetwerk via Home Assistant Ingress bewijzen. Geen nieuwe productfunctie, providerrequest of directe ongeauthenticeerde bridgepoort. Het netwerkadres moet uit actuele waarneming blijken, niet uit een vermoeden. Read-only netwerkinfo bevestigt inmiddels `192.168.88.253`; de gebruikerslink is [CREMS Energie](http://192.168.88.253:8123/hassio/ingress/350f0e24_crems_energy).
+
+Owner productie-/toolcode: root, de enige schrijver. Exacte write set root: `tools/release-crems.ps1`, `tools/ha-supervisor.mjs`, `tools/ha-supervisor.test.mjs`, `apps/bridge/test/production-start.test.ts` uitsluitend voor een echte peer-403-regressietest. Agent A schrijft uitsluitend `TASKS.md`, `REQUIREMENTS.md`, `ARCHITECTURE.md`, `README.md`, `PRODUCT_AUDIT.md`, `docs/release-home-assistant.md`, `docs/task-061-review.md`, `REVIEW.md`. Agent B voert tests read-only uit; Agent C voert read-only QA uit. Geen wijzigingen aan `.harness`-attestaties, productiegedrag, dependencies of manifests binnen deze taak.
+
+Acceptatie: actuele build/tests/typecheck en toolregressies PASS; diffcheck en onafhankelijke code-review; Git bevat alleen gecontroleerde wijzigingen; onveranderde gepubliceerde v0.1.13/image blijft traceerbaar; Supervisor bevestigt doelversie en draaiende toestand; alleen bij benodigde appupdate wordt backup afgedwongen; LAN-Home Assistant is bereikbaar en CREMS opent via geauthenticeerde Ingress. Geen tokens, opties of persoonsgegevens in uitvoer. Bij onzekere updatestatus eerst read-only verifiëren voordat een mutatie opnieuw wordt uitgevoerd.
+
+Gebruikersroute: open `http://<actueel-Pi-LAN-adres>:8123`, meld aan bij Home Assistant en open CREMS Energie. De add-on luistert intern op 8099 en laat uitsluitend Supervisor-peer `172.30.32.2` toe. Desktop/mobiel, refresh/opslag, live waarden, foutstaten en runtimecachecontrole vereisen een actuele Agent C-browser-PASS; zonder nieuwe expliciete browseropdracht blijft die gate NOT RUN. Historische browserrapporten zijn geen actuele Pi-goedkeuring.
+
+Actueel bewijs 1 oktober: geauthenticeerde Supervisor-info bevestigt `version=0.1.13`, `version_latest=0.1.13`, `state=started`. Geen update uitgevoerd; appbackup niet gemaakt of gecontroleerd in deze run. Pi-netwerkinfo bevestigt LAN-adres `192.168.88.253/24` (end0, gateway `192.168.88.1`). Direct LAN-HTTP vanaf de huidige host liep in timeout; via Tailscale gaven HA en geauthenticeerde Ingress HTTP 200. Dit bewijst geen rechtstreekse LAN-bereikbaarheid vanaf deze host. Core 65/65, web 134/134, bridge 101/101 vóór de nieuwe test, build/typecheck PASS; productie-start inclusief peerregressie 9/9 en helper/harness 11/11 PASS. Finale root-harness na docs volgt. Bewijs en resterende beperkingen worden vastgelegd in `docs/task-061-review.md`. Beperkte wijzigingen zijn APPROVED; Task 061 blijft CHANGES REQUIRED tot directe LAN- en browsercriteria bewezen zijn. Er wordt geen volledige releasegoedkeuring geclaimd.
+
+## Previously approved task
+
 ### Task 060 — Fluvius-CSV gebruiken voor contractjaarverbruik — 29 september 2026
 
 **Status:** APPROVED — volledige tests/build/typecheck PASS, Astra/Agent A-review PASS en Agent C volledige localhost-flow PASS. Tag `v0.1.13` en linux/arm64-image zijn gepubliceerd; Pi-installatie wacht op een long-lived HA-token die de gebruiker veilig in de terminalprompt invoert. Geen providerrequest.
@@ -560,3 +576,5 @@ Ontbrekend bewijs: één echte, door de gebruiker gesaniteerde Fluvius-exportfix
 - Task 026 — veilig endpoint voor echte dagprijzen — `APPROVED`.
 - Task 027 — echte dagprijs in de bestaande grafiek — `APPROVED`.
 - Task 028 — echte Fluvius-mapping en privacyveilige kwartierpreview — `APPROVED`.
+
+Actuele netwerkbevinding Task 061 (1 oktober): de huidige pc heeft Wi-Fi-adres `192.168.0.243/24`, gateway `192.168.0.1`; de Pi heeft `192.168.88.253/24`, gateway `192.168.88.1`. Ze zitten in verschillende IPv4-subnets. De directe timeout past bij ontbrekende routering tussen deze netwerken; de routerconfiguratie is niet gecontroleerd of gewijzigd. De pc moet toegang krijgen tot het Pi-subnet (bijvoorbeeld hetzelfde niet-geïsoleerde thuisnetwerk) of een bestaande route gebruiken. De tijdens deze run werkende toegang gebruikt [Home Assistant via Tailscale](http://homeassistant.tail582404.ts.net:8123/hassio/ingress/350f0e24_crems_energy). Er is geen bewijs dat een willekeurig apparaat op het Pi-subnet niet kan verbinden.

@@ -11,7 +11,7 @@ Zelfstandige energie-app die naast Home Assistant draait. De productiecode staat
 - zelfstandige frontend met Home Assistant als optionele read-only databron;
 - lokaal gebonden aan `127.0.0.1`.
 
-Nog niet vrijgegeven als complete productflow: duurzaam financieel batterijrapport, persoonlijke contractvergelijking en Raspberry Pi-deployment. De audit van 24 september 2026 meldt daarnaast open P1-herstelpunten in centrale opslag, bronkwaliteit en financiële snapshotvalidatie. Zie `PRODUCT_AUDIT.md`, `docs/full-audit-2026-09-24.md` en de actieve audit-/hersteltaak in `TASKS.md`.
+De webapp bevat Energiepaspoort v2, batterijrapport v3 en persoonlijke contractvergelijking. De P1-codebevindingen uit de audit van 24 september zijn hersteld met regressies. Release 0.1.13 is gepubliceerd en de actuele Supervisor-info van 1 oktober bevestigt dat deze op de Pi draait. Task 061 bevestigt Pi-adres `192.168.88.253`; open [CREMS Energie](http://192.168.88.253:8123/hassio/ingress/350f0e24_crems_energy) vanuit het thuisnetwerk. Directe LAN-HTTP gaf vanaf de huidige host timeout; Ingress via Tailscale gaf HTTP 200. De volledige actuele Pi-browsergate, runtimecache- en rollbackcontroles blijven open; zie `PRODUCT_AUDIT.md` en `TASKS.md`.
 
 ## Structuur
 
@@ -43,7 +43,7 @@ pnpm build
 pnpm start:bridge
 ```
 
-Dit start uitsluitend de gebouwde bridge op `127.0.0.1`; het startcommando compileert niets en start geen webapp. Externe toegang en de platforminstallatie op een Raspberry Pi vereisen nog een afzonderlijke beveiligings- en installatiebeslissing.
+Dit start de gebouwde bridge op `127.0.0.1`; het startcommando compileert niets en start geen webapp. De Home Assistant-add-on gebruikt een gecombineerde runtime achter geauthenticeerde Ingress. Vanaf hetzelfde netwerk open je `http://<Pi-LAN-adres>:8123`, meld je aan en kies je CREMS Energie. Poort 8099 is intern en wordt niet rechtstreeks gepubliceerd. De actuele bereikbaarheid wordt afzonderlijk bewezen in Task 061. Zie `docs/release-home-assistant.md`.
 
 Controles:
 
@@ -57,3 +57,5 @@ pnpm build
 De bridge leest momenteel de echte digitale-metersensoren via Home Assistants lokale REST API en valt zonder lokale configuratie expliciet terug op simulatie. Het token staat uitsluitend in `apps/bridge/.env` en wordt door Git genegeerd.
 
 Een module met groene tests is niet automatisch een vrijgegeven gebruikersfunctie. Zichtbaar gedrag vereist voortaan ook de browser/end-to-end releasegate uit `AGENT_PLAYBOOK.md`.
+
+Actuele netwerkbevinding Task 061 (1 oktober): de huidige pc heeft Wi-Fi-adres `192.168.0.243/24`, gateway `192.168.0.1`; de Pi heeft `192.168.88.253/24`, gateway `192.168.88.1`. Ze zitten in verschillende IPv4-subnets. De directe timeout past bij ontbrekende routering tussen deze netwerken; de routerconfiguratie is niet gecontroleerd of gewijzigd. De pc moet toegang krijgen tot het Pi-subnet (bijvoorbeeld hetzelfde niet-geïsoleerde thuisnetwerk) of een bestaande route gebruiken. De tijdens deze run werkende toegang gebruikt [Home Assistant via Tailscale](http://homeassistant.tail582404.ts.net:8123/hassio/ingress/350f0e24_crems_energy). Er is geen bewijs dat een willekeurig apparaat op het Pi-subnet niet kan verbinden.

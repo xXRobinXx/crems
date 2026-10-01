@@ -28,18 +28,15 @@ function Invoke-Checked([string] $Command, [string[]] $Arguments) {
 }
 
 function Invoke-Supervisor([string] $Method, [string] $Path, [object] $Body = $null) {
-    $request = @{
-        Method      = $Method
-        Uri         = "$($script:haBase)/api/hassio/$Path"
-        Headers     = @{ Authorization = "Bearer $script:haToken" }
-        TimeoutSec  = 60
-        ErrorAction = 'Stop'
+    $request = @{ url = $script:haBase; token = $script:haToken; method = $Method; path = $Path; body = $Body }
+    try {
+        $response = ($request | ConvertTo-Json -Depth 8 -Compress) | & node (Join-Path $PSScriptRoot 'ha-supervisor.mjs')
+        if ($LASTEXITCODE -ne 0) { throw 'Supervisor-aanvraag mislukt; controleer de appstatus voordat je opnieuw probeert.' }
+        return ($response | ConvertFrom-Json)
     }
-    if ($null -ne $Body) {
-        $request.ContentType = 'application/json'
-        $request.Body = $Body | ConvertTo-Json -Depth 8 -Compress
+    finally {
+        $request.token = $null
     }
-    Invoke-RestMethod @request
 }
 
 function Wait-Workflow([string] $Commit, [string] $TagName, [int] $TimeoutMinutes) {
@@ -120,7 +117,7 @@ try {
         }
         & git merge-base --is-ancestor $localTagCommit HEAD
         if ($LASTEXITCODE -ne 0) { throw "Tag $tag is geen voorouder van HEAD; release kan niet veilig worden hervat." }
-        & git diff --quiet $localTagCommit HEAD -- . ':(exclude)tools/release-crems.ps1' ':(exclude)docs/**' ':(exclude)TASKS.md' ':(exclude)REVIEW.md' ':(exclude)PRODUCT_AUDIT.md'
+        & git diff --quiet $localTagCommit HEAD -- . ':(exclude)tools/release-crems.ps1' ':(exclude)tools/ha-supervisor.mjs' ':(exclude)tools/ha-supervisor.test.mjs' ':(exclude)docs/**' ':(exclude)TASKS.md' ':(exclude)REVIEW.md' ':(exclude)PRODUCT_AUDIT.md'
         if ($LASTEXITCODE -ne 0) { throw "Build-, dependency-, workflow- of andere input is gewijzigd na tag $tag; hervatten is geweigerd." }
         $tagCommit = $localTagCommit
     }
@@ -163,7 +160,7 @@ try {
         if (-not $haToken) { throw "Release is gepubliceerd; start opnieuw met -ResumePublishedRelease om de Pi-update af te ronden." }
         $script:haToken = $haToken
         $null = Invoke-Supervisor -Method Post -Path 'store/reload' -Body @{}
-        $infoResponse = Invoke-Supervisor -Method Get -Path "store/addons/$haSlug"
+        $infoResponse = Invoke-Supervisor -Method Get -Path "addons/$haSlug/info"
         $info = $infoResponse.data
         if (-not $info -or $info.version_latest -ne $Version) {
             throw "Home Assistant toont versie '$($info.version_latest)' in de appcatalogus; verwacht $Version. De image is wel gepubliceerd."
@@ -172,10 +169,15 @@ try {
             Write-Host "CREMS Energie $Version draait al op de Pi."
             return
         }
-        $updateResponse = Invoke-Supervisor -Method Post -Path "store/addons/$haSlug/update" -Body @{ backup = $true; background = $false }
+        $updateResponse = Invoke-Supervisor -Method Post -Path "addons/$haSlug/update" -Body @{ backup = $true }
         if ($updateResponse.result -ne 'ok') { throw 'Home Assistant heeft de add-onupdate niet bevestigd; controleer Back-ups en de add-onstatus.' }
-        $verifiedResponse = Invoke-Supervisor -Method Get -Path "store/addons/$haSlug"
-        $verified = $verifiedResponse.data
+        $verifyDeadline = [DateTimeOffset]::UtcNow.AddMinutes(2)
+        do {
+            $verifiedResponse = Invoke-Supervisor -Method Get -Path "addons/$haSlug/info"
+            $verified = $verifiedResponse.data
+            if ($verified.version -eq $Version -and $verified.state -eq 'started') { break }
+            Start-Sleep -Seconds 5
+        } while ([DateTimeOffset]::UtcNow -lt $verifyDeadline)
         if ($verified.version -ne $Version -or $verified.state -ne 'started') {
             throw "Versiecontrole mislukt: Home Assistant rapporteert '$($verified.version)' met status '$($verified.state)'."
         }

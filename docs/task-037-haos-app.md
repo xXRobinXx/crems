@@ -1,5 +1,15 @@
 # Task 037 — CREMS als Home Assistant-app
 
+## Actuele aanvulling — 1 oktober 2026 / Task 061
+
+Geauthenticeerde read-only Supervisor-info bevestigt inmiddels versie **0.1.13**, nieuwste versie **0.1.13**, toestand **started**. Deze run heeft geen update uitgevoerd en geen nieuwe backup gemaakt of gecontroleerd. De onderstaande installatie-wachtstatus beschrijft de historische toestand van 29 september en is hiermee vervangen.
+
+Read-only netwerkinfo bevestigt Pi-adres `192.168.88.253/24`, gateway `192.168.88.1`. De huidige pc gebruikt `192.168.0.243/24`, gateway `192.168.0.1`; ze zitten in verschillende subnets. Directe LAN-HTTP vanaf deze host gaf timeout. Via Tailscale gaven HA en tijdelijke geauthenticeerde CREMS-Ingress HTTP 200; HTML/health/current zijn no-store en de actuele gehashte JS/CSS immutable. Dit bewijst HTTP-runtime over Tailscale, geen directe LAN- of browser-PASS.
+
+Gebruik vanaf het Pi-thuisnetwerk [CREMS Energie](http://192.168.88.253:8123/hassio/ingress/350f0e24_crems_energy), of de geverifieerde [Tailscale-route](http://homeassistant.tail582404.ts.net:8123/hassio/ingress/350f0e24_crems_energy). Directe LAN-bereikbaarheid, actuele Agent C desktop/mobiel-browsercontrole, opslag/herstart/reboot en rollback blijven open gates. Task 061 is CHANGES REQUIRED voor volledige gebruikersrelease. Zie `docs/task-061-review.md`.
+
+## Historische status — 29 september 2026
+
 Status: CREMS Energy `v0.1.12` blijft actief op de gekoppelde Home Assistant OS / Raspberry Pi 4 totdat de afzonderlijke Supervisor-update is afgerond. Task 060 heeft `v0.1.13` gepubliceerd via workflow [36600366405](https://github.com/xXRobinXx/crems/actions/runs/36600366405), OCI-index `sha256:bd8000e778e61b94ac5a312b2f546e67e4943aa5a8adb9779858283e0ddc5add`, ARM64 `sha256:39c2ce281cbb8198ce6be876e8f44a1bf27ad82a94b02a89e8adb7d45925fccd`. De installatieprocedure wacht op veilige lokale invoer van een Home Assistant long-lived token; vóór update maakt Supervisor een appback-up. Pi-specifieke 375×812- en 1280×900-viewports, browserconsole en cache/netwerkbewijs zijn niet uitgevoerd omdat de beschikbare browserbediening die metingen niet ondersteunt; zie Task 058 en 059.
 
 ## Doel
