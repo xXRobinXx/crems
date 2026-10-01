@@ -263,3 +263,62 @@ test("periodefilter zonder dagdata behoudt bestaande totalen en biedt echt herin
   let choices=0;const h=host(app.ReleaseBatteryResult);const tree=h.render({comparisons:technical.map(t=>({capacityKwh:t.capacityKwh,powerKw:t.powerKw,result:t})),quality,isSaved:true,onSave:()=>false,onChooseSource:()=>choices++});
   const filter=find(tree,n=>n.props?.["aria-label"]==="Periode van capaciteitsgrafiek");assert.ok(nodes(filter).filter(n=>n.type==="input").every(n=>n.props.disabled));assert.match(text(tree),/Dit rapport bevat geen dagdata/);assert.match(text(find(tree,n=>n.props?.className==="battery-bars")),/100 kWh/);button(tree,"Kies CSV voor periodefilter").props.onClick();assert.equal(choices,1);h.dispose();
 });
+
+
+test("lokale legacy en corrupte cleanup raken het Pi-rapport niet", async()=>{
+ const originalFetch=globalThis.fetch;
+ try {for(const [key,raw,label] of [
+  ["crems.battery-analysis.v1",JSON.stringify({version:1,period:quality.period,comparisons:technical}),"Verwijder ouder resultaat"],
+  ["crems.battery-analysis.v1","broken json","Verwijder onleesbaar rapport"],
+  ["crems.battery-analysis.v3","broken json","Verwijder onleesbaar rapport"]
+ ]) {
+  const s=storage();s.data.clear();s.data.set(key!,raw!);globals.window={localStorage:s};
+  let reads=0;const deletes:string[]=[];
+  globalThis.fetch=async(url,init)=>{if(init?.method==="DELETE"){deletes.push(String(url));return new Response(null,{status:204});}reads++;return new Response(null,{status:503});};
+  const h=host(app.App);
+  try {let tree=h.render();h.flush();await waitFor(()=>reads===2);await waitFor(()=>{tree=h.render();return /Centrale opslag is niet leesbaar/.test(text(tree));});
+   button(tree,"3. Batterij").props.onClick();tree=h.render();button(tree,label!).props.onClick();await Promise.resolve();assert.equal(s.data.has(key!),false);assert.deepEqual(deletes,[]);
+  }finally{h.dispose();}
+ }}finally{globalThis.fetch=originalFetch;delete globals.window;}
+});
+
+test("expliciete verwijdering van geldig huidig rapport verwijdert browser en Pi",async()=>{
+ const originalFetch=globalThis.fetch,s=storage();globals.window={localStorage:s};const deletes:string[]=[];
+ globalThis.fetch=async(url,init)=>{if(init?.method==="DELETE"){deletes.push(String(url));return new Response(null,{status:204});}return new Response(null,{status:503});};
+ const h=host(app.App);
+ try{let tree=h.render();button(tree,"3. Batterij").props.onClick();tree=h.render();const planner=find(tree,n=>n.type===app.BatteryPlanner);const child=host(planner.type);try{button(child.render(planner.props),"Verwijder rapport uit browser en van Pi");}finally{child.dispose();}planner.props.onForget();await Promise.resolve();assert.equal(s.data.has("crems.battery-analysis.v3"),false);assert.equal(deletes.length,1);assert.match(deletes[0]!,/api\/results\/battery-report$/);}finally{h.dispose();globalThis.fetch=originalFetch;delete globals.window;}
+});
+
+const deletionProfile={version:2,savedAt:"2026-09-10T00:00:00Z",period:quality.period,measuredImportKwh:100,estimatedImportKwh:0,measuredExportKwh:50,estimatedExportKwh:0,measuredCount:35040,estimatedCount:0,noConsumptionCount:0,integrityReliable:true,gapCount:0,duplicateCount:0,overlapCount:0};
+test("profiel blijft zichtbaar bij opslagverwijderfout zonder Pi-delete",async()=>{
+ const originalFetch=globalThis.fetch,s=storage();s.data.set("crems.local-energy-profile.v2",JSON.stringify(deletionProfile));s.data.delete("crems.battery-analysis.v3");s.removeItem=()=>{throw Error("blocked");};globals.window={localStorage:s};let deletes=0;
+ globalThis.fetch=async(_url,init)=>{if(init?.method==="DELETE")deletes++;return new Response(null,{status:204});};const h=host(app.App);
+ try{let tree=h.render();button(tree,"1. Data").props.onClick();tree=h.render();button(tree,"Verwijder profiel uit browser en van Pi").props.onClick();tree=h.render();button(tree,"Verwijder profiel uit browser en van Pi");assert.match(text(tree),/Verwijderen lukte niet/);assert.equal(s.data.get("crems.local-energy-profile.v2"),JSON.stringify(deletionProfile));await Promise.resolve();assert.equal(deletes,0);}finally{h.dispose();globalThis.fetch=originalFetch;delete globals.window;}
+});
+
+test("vertraagde centrale uitlezing draait expliciet verwijderen niet terug",async()=>{
+ const originalFetch=globalThis.fetch;
+ try{for(const kind of ["profile","battery"]){const s=storage();if(kind==="profile")s.data.delete("crems.battery-analysis.v3");s.data.set("crems.local-energy-profile.v2",JSON.stringify(deletionProfile));globals.window={localStorage:s};const pending:Array<()=>void>=[];let deletes=0;
+ globalThis.fetch=async(url,init)=>{if(init?.method==="DELETE"){deletes++;return new Response(null,{status:204});}return await new Promise<Response>(resolve=>pending.push(()=>resolve(new Response(JSON.stringify({result:String(url).endsWith("energy-profile")?deletionProfile:saved}),{status:200}))));};
+ const h=host(app.App);try{let tree=h.render();h.flush();await waitFor(()=>pending.length===2);
+ if(kind==="profile"){button(tree,"1. Data").props.onClick();tree=h.render();button(tree,"Verwijder profiel uit browser en van Pi").props.onClick();}else{button(tree,"3. Batterij").props.onClick();tree=h.render();find(tree,n=>n.type===app.BatteryPlanner).props.onForget();}
+ pending.forEach(resolve=>resolve());await new Promise(resolve=>setTimeout(resolve,0));tree=h.render();assert.equal(deletes,1);
+ if(kind==="profile"){assert.equal(s.data.has("crems.local-energy-profile.v2"),false);assert.equal(nodes(tree).some(n=>n.type==="button"&&text(n)==="Verwijder profiel uit browser en van Pi"),false);}else{assert.equal(s.data.has("crems.battery-analysis.v3"),false);assert.equal(find(tree,n=>n.type===app.BatteryPlanner).props.saved,undefined);}
+ }finally{h.dispose();}}
+ }finally{globalThis.fetch=originalFetch;delete globals.window;}
+});
+
+test("vertraagde centrale uitlezing overschrijft een nieuw bewaard batterijrapport niet",async()=>{
+ const originalFetch=globalThis.fetch,s=storage();globals.window={localStorage:s};const pending:Array<()=>void>=[];let puts=0;
+ globalThis.fetch=async(url,init)=>{if(init?.method==="PUT"){puts++;return new Response(null,{status:204});}return await new Promise<Response>(resolve=>pending.push(()=>resolve(new Response(JSON.stringify({result:String(url).endsWith("energy-profile")?null:saved}),{status:200}))));};const h=host(app.App);
+ try{let tree=h.render();h.flush();await waitFor(()=>pending.length===2);button(tree,"3. Batterij").props.onClick();tree=h.render();const newer={...saved,savedAt:"2026-10-01T12:00:00Z"};find(tree,n=>n.type===app.BatteryPlanner).props.onSaved(newer);pending.forEach(resolve=>resolve());await new Promise(resolve=>setTimeout(resolve,0));tree=h.render();assert.deepEqual(find(tree,n=>n.type===app.BatteryPlanner).props.saved,newer);assert.equal(puts,1);}finally{h.dispose();globalThis.fetch=originalFetch;delete globals.window;}
+});
+
+
+test("vertraagde centrale uitlezing overschrijft een nieuw bewaard energieprofiel niet",async()=>{
+ const originalFetch=globalThis.fetch,s=storage();s.data.clear();globals.window={localStorage:s};const pending:Array<()=>void>=[];let puts=0;
+ globalThis.fetch=async(url,init)=>{if(init?.method==="PUT"){puts++;return new Response(null,{status:204});}return await new Promise<Response>(resolve=>pending.push(()=>resolve(new Response(JSON.stringify({result:String(url).endsWith("energy-profile")?deletionProfile:null}),{status:200}))));};const h=host(app.App);
+ try{let tree=h.render();h.flush();await waitFor(()=>pending.length===2);button(tree,"1. Data").props.onClick();tree=h.render();find(tree,n=>n.type==="input"&&n.props.type==="file").props.onChange({target:{files:[{size:csv.length,stream:()=>new Blob([csv]).stream()}]}});
+ await waitFor(()=>{tree=h.render();return nodes(tree).some(n=>n.type==="button"&&text(n)==="Bewaar energiebalans");});button(tree,"Bewaar energiebalans").props.onClick();const newer=JSON.parse(s.data.get("crems.local-energy-profile.v2")!);assert.notDeepEqual(newer.period,deletionProfile.period);pending.forEach(resolve=>resolve());await new Promise(resolve=>setTimeout(resolve,0));tree=h.render();button(tree,"2. Rapport").props.onClick();tree=h.render();assert.deepEqual(find(tree,n=>typeof n.type==="function"&&n.type.name==="EnergyReportPage").props.profile,newer);assert.equal(puts,1);
+ }finally{h.dispose();globalThis.fetch=originalFetch;delete globals.window;}
+});
