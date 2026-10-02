@@ -94,3 +94,55 @@ test("ongeldig opslaan stopt vóór de netwerkwrite", async () => {
   await assert.rejects(() => client.saveEnergyProfile({ ...profile, measuredImportKwh: -1 }), (error: unknown) => error instanceof CentralResultsError && error.code === "invalid");
   assert.equal(calls, 0);
 });
+
+const tick = () => new Promise<void>(resolve => setTimeout(resolve, 0));
+
+test("mutaties behouden klikvolgorde en bevriezen de wachtende snapshot", async () => {
+  const calls: Array<{method:string;body?:string}> = [];
+  let finishFirst!: () => void;
+  const client = createCentralResultsClient({fetchImpl: (async (_url, init) => {
+    calls.push({method:init!.method!,body:init?.body as string|undefined});
+    if(calls.length===1) await new Promise<void>(resolve=>{finishFirst=resolve;});
+    return new Response(null,{status:204});
+  }) as typeof fetch});
+  const first=client.saveEnergyProfile(profile);
+  const removed=client.removeEnergyProfile();
+  const next={...profile,period:{...profile.period},measuredImportKwh:7};
+  const savedNext=client.saveEnergyProfile(next);
+  next.measuredImportKwh=999; next.period.start="invalid";
+  await tick(); assert.deepEqual(calls.map(c=>c.method),["PUT"]);
+  finishFirst();
+  await Promise.all([first,removed,savedNext]);
+  assert.deepEqual(calls.map(c=>c.method),["PUT","DELETE","PUT"]);
+  assert.equal(JSON.parse(calls[2]!.body!).measuredImportKwh,7);
+  assert.equal(JSON.parse(calls[2]!.body!).period.start,profile.period.start);
+  assert.equal((await savedNext).measuredImportKwh,7);
+});
+
+test("een mislukte mutatie blokkeert latere verwijdering niet", async () => {
+  const calls:string[]=[];let rejectFirst!: (error:Error)=>void;
+  const client=createCentralResultsClient({fetchImpl:(async(_url,init)=>{
+    calls.push(init!.method!);
+    if(calls.length===1)await new Promise<void>((_resolve,reject)=>{rejectFirst=reject;});
+    return new Response(null,{status:204});
+  }) as typeof fetch});
+  const saved=client.saveBatteryReport(battery);
+  const failed=assert.rejects(saved,(error:unknown)=>error instanceof CentralResultsError&&error.code==="network");
+  const removed=client.removeBatteryReport();
+  await tick();assert.deepEqual(calls,["PUT"]);
+  rejectFirst(new Error("offline"));await failed;await removed;
+  assert.deepEqual(calls,["PUT","DELETE"]);
+});
+
+test("profiel en batterij hebben onafhankelijke mutatiewachtrijen", async () => {
+  const calls:string[]=[];let finishProfile!:()=>void;
+  const client=createCentralResultsClient({fetchImpl:(async(url)=>{
+    calls.push(String(url));
+    if(String(url).endsWith("energy-profile"))await new Promise<void>(resolve=>{finishProfile=resolve;});
+    return new Response(null,{status:204});
+  }) as typeof fetch});
+  const saving=client.saveEnergyProfile(profile);
+  await client.removeBatteryReport();
+  assert.equal(calls.length,2);assert.match(calls[1]!,/battery-report$/);
+  finishProfile();await saving;
+});

@@ -290,6 +290,36 @@ test("expliciete verwijdering van geldig huidig rapport verwijdert browser en Pi
 });
 
 const deletionProfile={version:2,savedAt:"2026-09-10T00:00:00Z",period:quality.period,measuredImportKwh:100,estimatedImportKwh:0,measuredExportKwh:50,estimatedExportKwh:0,measuredCount:35040,estimatedCount:0,noConsumptionCount:0,integrityReliable:true,gapCount:0,duplicateCount:0,overlapCount:0};
+test("oude synchronisatiefouten overschrijven latere batterijacties niet",async()=>{
+ const originalFetch=globalThis.fetch;
+ try{for(const older of ["PUT","DELETE"]){const s=storage();globals.window={localStorage:s};let rejectOld!:(error:Error)=>void;let pending=false;
+ globalThis.fetch=async(_url,init)=>{if(init?.method===older&&!pending){pending=true;return await new Promise<Response>((_resolve,reject)=>{rejectOld=reject;});}return new Response(null,{status:init?.method==="GET"?503:204});};
+ const h=host(app.App);try{let tree=h.render();button(tree,"3. Batterij").props.onClick();tree=h.render();let planner=find(tree,n=>n.type===app.BatteryPlanner);
+ if(older==="PUT"){planner.props.onSaved(saved);await waitFor(()=>pending);tree=h.render();find(tree,n=>n.type===app.BatteryPlanner).props.onForget();}else{planner.props.onForget();await waitFor(()=>pending);tree=h.render();find(tree,n=>n.type===app.BatteryPlanner).props.onSaved(saved);}
+ rejectOld(new Error("outdated failure"));await new Promise(resolve=>setTimeout(resolve,0));tree=h.render();
+ assert.match(text(tree),older==="PUT"?/Batterijrapport verwijderd/:/Batterijrapport bewaard/);
+ assert.doesNotMatch(text(tree),/Lokaal bewaard, maar synchroniseren|Lokaal verwijderd, maar verwijderen/);
+ assert.equal(find(tree,n=>n.type===app.BatteryPlanner).props.saved!==undefined,older==="DELETE");
+ }finally{h.dispose();}}
+ }finally{globalThis.fetch=originalFetch;delete globals.window;}
+});
+
+test("oude synchronisatiefouten overschrijven latere profielacties niet",async()=>{
+ const originalFetch=globalThis.fetch;
+ try{for(const older of ["PUT","DELETE"]){const s=storage();s.data.clear();if(older==="DELETE")s.data.set("crems.local-energy-profile.v2",JSON.stringify(deletionProfile));globals.window={localStorage:s};let rejectOld!:(error:Error)=>void;let pending=false;
+ globalThis.fetch=async(_url,init)=>{if(init?.method===older&&!pending){pending=true;return await new Promise<Response>((_resolve,reject)=>{rejectOld=reject;});}return new Response(null,{status:init?.method==="GET"?503:204});};
+ const h=host(app.App);try{let tree=h.render();button(tree,"1. Data").props.onClick();tree=h.render();
+ if(older==="DELETE"){button(tree,"Verwijder profiel uit browser en van Pi").props.onClick();await waitFor(()=>pending);tree=h.render();}
+ find(tree,n=>n.type==="input"&&n.props.type==="file").props.onChange({target:{files:[{size:csv.length,stream:()=>new Blob([csv]).stream()}]}});
+ await waitFor(()=>{tree=h.render();return nodes(tree).some(n=>n.type==="button"&&text(n)==="Bewaar energiebalans");});button(tree,"Bewaar energiebalans").props.onClick();
+ if(older==="PUT"){await waitFor(()=>pending);tree=h.render();button(tree,"Verwijder profiel uit browser en van Pi").props.onClick();}
+ rejectOld(new Error("outdated failure"));await new Promise(resolve=>setTimeout(resolve,0));tree=h.render();
+ assert.doesNotMatch(text(tree),/Lokaal bewaard, maar synchroniseren|Lokaal verwijderd, maar verwijderen/);
+ assert.equal(s.data.has("crems.local-energy-profile.v2"),older==="DELETE");
+ }finally{h.dispose();}}
+ }finally{globalThis.fetch=originalFetch;delete globals.window;}
+});
+
 test("profiel blijft zichtbaar bij opslagverwijderfout zonder Pi-delete",async()=>{
  const originalFetch=globalThis.fetch,s=storage();s.data.set("crems.local-energy-profile.v2",JSON.stringify(deletionProfile));s.data.delete("crems.battery-analysis.v3");s.removeItem=()=>{throw Error("blocked");};globals.window={localStorage:s};let deletes=0;
  globalThis.fetch=async(_url,init)=>{if(init?.method==="DELETE")deletes++;return new Response(null,{status:204});};const h=host(app.App);

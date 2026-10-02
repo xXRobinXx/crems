@@ -93,6 +93,12 @@ const defaultFetch = (): typeof fetch => {
 export const createCentralResultsClient = (options: CentralResultsClientOptions = {}) => {
   const baseUrl = options.baseUrl ?? "";
   const fetchImpl = options.fetchImpl ?? defaultFetch();
+  const pending: Record<CentralResultKind, Promise<void>> = { "energy-profile": Promise.resolve(), "battery-report": Promise.resolve() };
+  const mutate = <T>(kind: CentralResultKind, operation: () => Promise<T>): Promise<T> => {
+    const next = pending[kind].then(operation);
+    pending[kind] = next.then(() => undefined, () => undefined);
+    return next;
+  };
 
   const getState = async <T extends StoredResult>(kind: CentralResultKind): Promise<CentralResultState<T>> => {
     let response: Response;
@@ -111,28 +117,31 @@ export const createCentralResultsClient = (options: CentralResultsClientOptions 
   };
 
   const put = async <T extends StoredResult>(kind: CentralResultKind, value: T): Promise<T> => {
-    parse(kind, value);
-    let response: Response;
-    try {
-      response = await fetchImpl(endpoint(baseUrl, kind), {
-        method: "PUT",
-        headers: { Accept: "application/json", "Content-Type": "application/json" },
-        body: JSON.stringify(value),
-      });
-    } catch (error) { return network(error); }
-    ensureResponse(response);
-    if (response.status === 204) return value;
-    const returned = await responseBody(response);
-    return (returned === undefined ? value : parse(kind, returned)) as T;
+    const snapshot = parse(kind, value) as T;
+    const body = JSON.stringify(snapshot);
+    return mutate(kind, async () => {
+      let response: Response;
+      try {
+        response = await fetchImpl(endpoint(baseUrl, kind), {
+          method: "PUT",
+          headers: { Accept: "application/json", "Content-Type": "application/json" },
+          body,
+        });
+      } catch (error) { return network(error); }
+      ensureResponse(response);
+      if (response.status === 204) return snapshot;
+      const returned = await responseBody(response);
+      return (returned === undefined ? snapshot : parse(kind, returned)) as T;
+    });
   };
 
-  const remove = async (kind: CentralResultKind): Promise<void> => {
+  const remove = (kind: CentralResultKind): Promise<void> => mutate(kind, async () => {
     let response: Response;
     try { response = await fetchImpl(endpoint(baseUrl, kind), { method: "DELETE", headers: { Accept: "application/json" } }); }
     catch (error) { return network(error); }
     if (response.status === 404) return;
     ensureResponse(response);
-  };
+  });
 
   return {
     getEnergyProfile: () => get<LocalEnergyProfile>("energy-profile"),
