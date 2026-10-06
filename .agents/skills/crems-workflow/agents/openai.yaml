@@ -1,0 +1,6 @@
+interface:
+  display_name: "CREMS workflow"
+  short_description: "Route CREMS work to code, scope and checks"
+  default_prompt: "Use $crems-workflow to continue the current CREMS task within its write set."
+policy:
+  allow_implicit_invocation: true

@@ -17,6 +17,7 @@ import { handleCentralStorageRequest } from "./central-storage-route.js";
 import { isHomeAssistantIngressPeer, stripHomeAssistantIngressPrefix } from "./ingress.js";
 import { createContractCatalogClient, type ContractCatalogConfig } from "./contract-catalog.js";
 import { handleContractCatalogRequest } from "./contract-catalog-route.js";
+import { handleLocalContractCatalogRequest } from "./local-contract-catalog.js";
 
 const envPath = fileURLToPath(new URL("../.env", import.meta.url));
 const localEnv: Record<string, string> = {};
@@ -86,6 +87,7 @@ const server = createServer((request, response) => {
   if (handlePriceHistoryRequest(request, response, source)) return;
   if (handleBelpexHistoryRequest(request,response,belpexArchive)) return;
   if (handleCentralStorageRequest(request, response, centralStorage)) return;
+  if (handleLocalContractCatalogRequest(request, response)) return;
   if (handleContractCatalogRequest(request, response, () => createContractCatalogClient(contractCatalogConfig))) return;
   if (url.pathname === "/api/current") return json(response, 200, latest);
   if (url.pathname === "/api/stream") {

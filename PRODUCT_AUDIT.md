@@ -1,5 +1,9 @@
 # CREMS Product Audit
 
+## Actuele baseline — documentatiecleanup 2 oktober 2026
+
+Laatste vastgelegde Pi-versie is **0.1.14**, installed/started met updatebackup en HTTP-runtimecontrole; zie [deploymentbewijs](docs/task-061-deployment014.md). De lokale **0.1.15-kandidaat** herstelt de contract-CSV-bestandskiezer; zie [begrensde review](docs/task-061-csv015-review.md). Deze documentatiecleanup voerde geen nieuwe externe controle uit. Volledige actuele Pi-browser-, fysieke LAN-, herstart-/resultaatbehoud- en rollbackgates blijven open; historische 0.1.13-/NOT RUN-/approvalteksten hieronder zijn gedateerde evidence. De volledige actuele openlijst staat bovenaan TASKS.md. Geen nieuwe releaseapproval of attestatie.
+
 ## Actuele releasebaseline — 1 oktober 2026
 
 Task 061 controleert de bestaande release, documentatie en LAN-toegang. Een actuele geauthenticeerde Supervisor-infoaanvraag bevestigt CREMS Energie **0.1.13**, nieuwste versie **0.1.13**, toestand **started**. Deze run voerde geen update uit en maakte of controleerde geen nieuwe appbackup. De publicatiegegevens van 29 september hieronder blijven de herkomst van de bestaande image.

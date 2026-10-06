@@ -1,43 +1,20 @@
-# Implementation Plan
+# CREMS vervolgplan
 
-## Actualisering — 1 oktober 2026 / Task 061
+Actueel onderhoudsplan: 2 oktober 2026. Task 061 is de enige actieve taak. Laatste vastgelegde Pi-versie is0.1.14; lokale kandidaat0.1.15. Geen nieuwe Supervisor-/browsercontrole met deze cleanup. [Openlijst en write sets](TASKS.md) zijn leidend naast REQUIREMENTS/ARCHITECTURE. Het vorige plan is [volledig bewaard](docs/history/implementation-plan-2026-10-01.md) als historische momentopname; oude taaklabels daar zijn geen actuele uitvoeropdracht.
 
-Historisch herstelplan: de taaknummers 036–038 hieronder zijn oude planlabels en mogen niet als actuele TASKS-identiteiten worden gebruikt. Task 061 is nu de enige actieve taak. Supervisor bevestigt geïnstalleerde CREMS 0.1.13 op 1 oktober; directe LAN-, volledige actuele browser-, herstart-/rollbackgates blijven open. REQUIREMENTS en TASKS zijn leidend.
+## Eerst Task 061 afronden
 
+1. **0.1.15 QA:** bevries kandidaatcode, herhaal finale fullchecks/review en bewijs de contract-CSV-regressie met actuele Agent C-browsercontrole na nieuwe expliciete gebruikersopdracht. Controleer cancel, herselectie, behouden formulierdata en geen automatische opslag/providerrequest.
+2. **Release en Pi:** alleen na actuele kandidaatgate onveranderlijke versie/tag/ARM64-image publiceren; appbackup vóór benodigde update; uitsluitend CREMS bijwerken; doelversie/started en geauthenticeerde Ingress/assets/API/SSE controleren. Bewijs de actuele Pi-gebruikersreis afzonderlijk.
+3. **LAN:** directe toegang via Home Assistant8123 vanaf het bedoelde Pi-subnet aantonen. Tailscale HTTP200 en localhostbewijzen vervangen dit niet; netwerkbeslissingen buiten de app apart oplossen.
+4. **Herstart en herstel:** veilige resultaten na add-on-/HA-herstart of reboot aantonen; backup en rollbackuitvoerbaarheid met vastgelegd bewijs controleren. Alleen gerichte, expliciet geautoriseerde mutaties.
+5. **Pi-performance:** cold/warm overdracht, cachegedrag en echte hardwaremetingen vastleggen. Geen snelheidsclaim alleen op basis van lokale tests.
 
-## Objective
+Elke stap krijgt concreet bewijs en behoudt de bestaande opslag/privacy/securitygrenzen. Resterende FAIL/NOT RUN houden de gebruikersrelease CHANGES REQUIRED. De onderbroken volledige onafhankelijke audit blijft afzonderlijk open bewijs; beperkte reviews vervangen haar niet.
 
-Maak van de bestaande modules één betrouwbare lokale MVP. Nieuwe functies stoppen totdat de kernreis na refresh aantoonbaar intact blijft.
+## Afzonderlijke backlog
 
-## Release 1 — herstelbaseline
+- **Contractprovider:** partnerrechten, voorwaarden/kosten, credentials en actuele response bevestigen vóór live gebruik. Geen account/providerrequest of promptoverdracht vanuit een cleanup. Bewaarde vergelijking, landelijke/dynamische marktdekking en volledige financiële offerte vragen eigen requirements en taak.
+- **App.tsx opdelen:** pas na afsluiting van de actieve release een aparte voorstel-/taakscope maken. Eerst huidige opslag/navigatiehandlers en regressies inventariseren; kies één scherm/clientgrens, exacte write set, geen gedragswijziging en passende regressies. Nog geen tweede actieve implementatietaak of bestandverplaatsing.
 
-1. Task 035 — duurzaam batterijrapport, schema-migratie, raceveiligheid en refreshgarantie.
-2. Task 036 — Energiepaspoort-toestemming en kwaliteitsmetadata consistent maken.
-3. Task 037 — één centraal contractmodel en bereikbare vaste/variabele contractflow.
-4. Task 038 — volledige browserreleasegate op desktop en mobiel.
-
-Task 035–037 zijn technisch geïntegreerd. Task 038 blijft de open menselijke browsergate; op uitdrukkelijk verzoek van de gebruiker neemt Codex het scherm niet over. Contractvergelijkingsopslag en marktbrede leveranciersdata blijven bewust buiten deze release.
-
-## Productstatus
-
-- Beschikbaar als module: live dashboard, echte daggrafiek/prijzen, streaming CSV-controle, Energiepaspoort-totalen, technische batterijmotor en pure vlakke contractberekening.
-- Beschikbaar in de lokale app: duurzame batterij-/financiële rapportflow, Energiepaspoort v2 en tijdelijke vergelijking van twee zelf ingevoerde vlakke contracten.
-- Niet vrijgegeven: bewaarde contractvergelijking, automatische contractkeuze, volledige batterij-offerte of Raspberry Pi-installatie.
-
-Zie `PRODUCT_AUDIT.md` voor het bewijs en de actuele blockers.
-
-## Validation Strategy
-
-- unit tests voor pure berekeningen en parsers;
-- fixturetests voor Belgische meter-/CSV-formaten;
-- bridge-integratietests met gemockte Home Assistant-responses;
-- pure tijd-/eenheidsnormalisatietests en begrensde history-routetests;
-- runtime gebruikersreistests naast unit- en integratietests;
-- verplichte browsergate vanuit schoon profiel én bestaande lokale toestand;
-- refresh, schema-migratie en expliciete verwijdering als vaste regressiescenario's;
-- typecheck en productiebuild bij iedere taak;
-- functionele controle van bronlabels en failure modes.
-
-## Out of Scope
-
-Nieuwe features, cloudhosting, betalingen, geautomatiseerd overstappen en deployment totdat de herstelrelease betrouwbaar is.
+Zie [documentatieindex](docs/README.md) voor procedures en gedateerd bewijs.

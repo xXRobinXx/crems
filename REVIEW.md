@@ -1,5 +1,23 @@
 # Review
 
+## Task 061 — twee cleanup-rondes — CODE APPROVED / gebruikersrelease CHANGES REQUIRED
+
+Agent A rondde onafhankelijke ronde2 af:12/12 tooltests, echte structuurcheck en canonical Task061 IN PROGRESS PASS;52 lokale links over12 actieve router/plan/index/moved-reviewbestanden zonder ontbrekend target. Drie oude onderhoudspaden zijn verdwenen; alleen de expliciete source→target-movebeschrijving in TASKS noemt ze nog. Historische release/browser-evidencepaden en gegenereerde QA-logs blijven intact. PLAN-hashregressie en docsindex/PLAN-checkerlinks inspectie PASS. Geen concrete blocker binnen deze organisatorische cleanup.
+
+Nieuwe repo-skill crems-workflow is aantoonbaar vermeld in de actuele developer skillcatalog (r7); dit bewijst ontdekking, geen ongecontroleerde skilluitvoering. Officiële quickvalidate blijft niet uitgevoerd wegens ontbrekende PyYAML. Finale rootfullchecks na bronfreeze volgen. Zie docs/reviews/task-061-cleanup-two-pass-review.md. Geen nieuwe releaseattestatie;0.1.15-browser/Pi/LAN/herstart/rollback/provider blijven open.
+
+
+## Task 061 — map/skill-router onderhoud — CODE APPROVED / gebruikersrelease CHANGES REQUIRED
+
+Agent A inspecteerde router/rol/mapdocumentatie, harness/parser/fingerprint, structuurchecker/testdiffs en de beperkte tsconfigopschoning. Bewezen YAML-trailingcomment-false-PASS is hersteld met regression; Docker COPY werkt met expliciete goedgekeurde bronlijst en onbekende syntaxis faalt. Duplicate task-ID behoudt canonieke status; expliciete heading prevaleert boven een eerdere historische completedregel. Zelfstandige toolherhaling **12/12 PASS**, echte check:structure PASS; geen concrete resterende blocker binnen deze onderhoudscope.
+
+Routinginspectie voor CSV-fix, Pi-onbereikbaar, spreadsheetartifact en structuuraudit respecteert source of truth/write set en geeft geen browser/provider/global rechten. Officiële skillquickvalidate niet uitgevoerd wegens ontbrekende PyYAML; eigen metadata/linkchecks PASS, native skillcatalogdiscovery niet getest. Finale fullharness na bevriezen volgt; geen releaseattestatie. Pi/LAN/browser/herstart/rollback/providergates blijven open. Zie docs/reviews/task-061-structure-review.md voor beperkt bewijs.
+
+
+## Actuele baseline — documentatiecleanup 2 oktober 2026
+
+Laatste vastgelegde Pi-versie is **0.1.14**, installed/started met updatebackup en HTTP-runtimecontrole; zie [deploymentbewijs](docs/task-061-deployment014.md). De lokale **0.1.15-kandidaat** herstelt de contract-CSV-bestandskiezer; zie [begrensde review](docs/task-061-csv015-review.md). Deze documentatiecleanup voerde geen nieuwe externe controle uit. Volledige actuele Pi-browser-, fysieke LAN-, herstart-/resultaatbehoud- en rollbackgates blijven open; historische 0.1.13-/NOT RUN-/approvalteksten hieronder zijn gedateerde evidence. De volledige actuele openlijst staat bovenaan TASKS.md. Geen nieuwe releaseapproval of attestatie.
+
 ## Task 061 — Finale aanvullende backendreview — CODE APPROVED / UITROL CHANGES REQUIRED
 
 De begrensde centrale-opslag- en meterpollreparaties zijn door Agent A onafhankelijk gereviewd; geen concrete codeblocker gevonden. Zes bewezen herstelgebieden: malformed nested entries, financiële validatorpariteit, dag/DST/gap/energiebalanspariteit, oversized PUT413, singleflight-meterreads/herstel, gecombineerde storelimiet vóór write. Finale full harness PASS: core 65/65, bridge 110/110, web 134/134, harness 5/5; build/typecheck PASS; helpertests apart 6/6. Stabiele fingerprint `8f0b825dc5e66b3eea002005ef2de6bc23069ed3de6234011e52b17db55c86d8`. De vorige hieronder gedateerde counts beschrijven de eerste auditronde.

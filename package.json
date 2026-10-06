@@ -4,7 +4,9 @@
   "packageManager": "pnpm@11.19.0",
   "scripts": {
     "harness": "node tools/harness.mjs",
-    "test:harness": "node --test tools/harness.test.mjs",
+    "test:harness": "node --test tools/harness.test.mjs tools/check-structure.test.mjs",
+    "check:structure": "node tools/check-structure.mjs",
+    "test:structure": "node --test tools/check-structure.test.mjs",
     "dev": "pnpm --parallel --filter @crems/bridge --filter @crems/web dev",
     "dev:web": "pnpm --filter @crems/web dev",
     "dev:bridge": "pnpm --filter @crems/bridge dev",

@@ -33,3 +33,7 @@ Bij conflict: rapporteer het conflict en verander geen requirements stilzwijgend
 ## Definition of Done
 
 Een taak is pas klaar wanneer acceptance criteria en relevante tests slagen, bekende regressies zijn uitgesloten, documentatie klopt en de reviewstatus `APPROVED` is. Voor zichtbaar gedrag is bovendien een vastgelegd Agent C-browserrapport met PASS verplicht.
+
+## Projectrouting
+
+Voor CREMS-onderhoud gebruikt de repo-skill [crems-workflow](.agents/skills/crems-workflow/SKILL.md) de [repositorykaart](docs/guides/repository-map.md). Lees alleen de passende route en relevante rolbeschrijving; skills en rolbestanden vervangen de source of truth hierboven niet. `pnpm check:structure` controleert actieve map-/metadatagrenzen. Onderzoek naar externe routers staat in [skill-routing-research](docs/research/skill-routing-research.md); een routerselectie verleent geen browser-, deployment- of externe gegevensoverdrachtsautorisatie.

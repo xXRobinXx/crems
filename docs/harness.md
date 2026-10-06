@@ -10,11 +10,12 @@ Dit ontwikkelgereedschap gebruikt TASKS.md als takenbron. Geen extra register, d
 ## Gebruik
 
 - `pnpm harness status`: actuele genummerde taken en historische statussen, zonder dubbels. Uitbreidingen staan bij de specificatie in TASKS.md.
-- `pnpm test:harness`: synthetische tests voor parser, fingerprint en releasepoort.
-- `pnpm harness check`: voert harness-tests, root build, tests en typecheck sequentieel uit; stopt bij de eerste fout.
+- `pnpm test:harness`: synthetische tests voor parser, fingerprint, structuurgrenzen en releasepoort.
+- `pnpm check:structure`: controleert de echte workspace-/HA-metadatagrenzen, package-exports en lokale routerlinks; leest geen persoonlijke runtimeopslag.
+- `pnpm harness check`: voert harness-tests, structuurcontrole, root build, tests en typecheck sequentieel uit; stopt bij de eerste fout.
 - `pnpm harness gate`: controleert automatisch bewijs plus aparte Agent A- en Agent C-verklaringen. Exitcode 1 betekent niet goedgekeurd.
 
-Bewijs staat lokaal in de genegeerde map `.harness/`. Het bevat uitsluitend tijden, bronhash en exitcodes; geen testuitvoer, CSV of secrets. Een nieuwe run trekt eerder succes direct in. Code/configuratie en normatieve documentatie bepalen de SHA-256 fingerprint; bronwijzigingen tijdens of na de run maken het bewijs ongeldig. Gegenereerde bestanden en lokale data tellen niet mee. Dit werkt ook zonder Git.
+Machinebewijs in `.harness/checks.json` bevat uitsluitend tijden, bronhash en exitcodes. De genegeerde `.harness/`-map kan daarnaast synthetische QA-fixtures en lokale controlelogs bevatten; dat zijn geen releaseattestaties. Een nieuwe run trekt eerder succes direct in. Code/configuratie en normatieve documentatie bepalen de SHA-256 fingerprint; bronwijzigingen tijdens of na de run maken het bewijs ongeldig. Deze hash omvat nu ook PowerShell-tools, Dockerfile, GitHub-workflows, HA-rootmetadata, rolbestanden, repo-skillinstructies en hun vaste map-/harness-/release-/opslag-/HA-ontwerpverwijzingen. De exacte vaste bestanden staan in `fingerprintRootFiles` in tools/harness.mjs. Gegenereerde bestanden en lokale data tellen niet mee; bewijsrapporten onder docs blijven via afzonderlijke reportSha256 gebonden. Dit werkt ook zonder Git.
 
 ## Review en browsergate
 

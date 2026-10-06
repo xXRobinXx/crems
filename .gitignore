@@ -15,5 +15,5 @@ data/*.db-*
 apps/bridge/data/runtime/
 
 # Lokale referentiebestanden en oude prototypes zijn geen onderdeel van de app.
-archive/
-research/
+/archive/
+/research/

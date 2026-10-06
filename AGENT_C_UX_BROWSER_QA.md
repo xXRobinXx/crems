@@ -1,5 +1,7 @@
 # Agent C — UX / Browser QA
 
+Gebruik de [repositorykaart](docs/guides/repository-map.md) voor runtime-/Ingressroutes en de actuele taakscope voor scenario's. De [repo-workflow](.agents/skills/crems-workflow/SKILL.md) geeft geen browserautorisatie; onderstaande expliciete-opdrachtregel blijft gelden.
+
 Agent C schrijft geen repositorybestanden en implementeert geen fixes. Agent C bestuurt nooit zelfstandig het scherm of de browser van de gebruiker. Zonder een nieuwe expliciete opdracht gebruikt Agent C uitsluitend code, tests en screenshots die de gebruiker zelf deelt.
 
 Voor implementatie vertaalt Agent C de actieve taak naar concrete browserstappen. Na de handoff van Agent B controleert Agent C de werkende app vanuit een schoon profiel en, indien relevant, vanuit bestaande lokale opslag.

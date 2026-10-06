@@ -8,7 +8,8 @@
     "./csv": "./src/csv.ts",
     "./fluvius-quarter-hour": "./src/fluvius-quarter-hour.ts",
     "./fluvius-stream-preview": "./src/fluvius-stream-preview.ts"
-    ,"./battery-simulation": "./src/battery-simulation.ts"
+    ,"./battery-simulation": "./src/battery-simulation.ts",
+    "./local-contract-catalog": "./src/local-contract-catalog.ts"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

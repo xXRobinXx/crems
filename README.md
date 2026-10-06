@@ -11,7 +11,7 @@ Zelfstandige energie-app die naast Home Assistant draait. De productiecode staat
 - zelfstandige frontend met Home Assistant als optionele read-only databron;
 - lokaal gebonden aan `127.0.0.1`.
 
-De webapp bevat Energiepaspoort v2, batterijrapport v3 en persoonlijke contractvergelijking. De P1-codebevindingen uit de audit van 24 september zijn hersteld met regressies. Release 0.1.13 is gepubliceerd en de actuele Supervisor-info van 1 oktober bevestigt dat deze op de Pi draait. Task 061 bevestigt Pi-adres `192.168.88.253`; open [CREMS Energie](http://192.168.88.253:8123/hassio/ingress/350f0e24_crems_energy) vanuit het thuisnetwerk. Directe LAN-HTTP gaf vanaf de huidige host timeout; Ingress via Tailscale gaf HTTP 200. De volledige actuele Pi-browsergate, runtimecache- en rollbackcontroles blijven open; zie `PRODUCT_AUDIT.md` en `TASKS.md`.
+De webapp bevat Energiepaspoort v2, batterijrapport v3 en persoonlijke contractvergelijking. Het [deploymentrapport van 2 oktober](docs/task-061-deployment014.md) bevestigt Pi-versie 0.1.14; 0.1.15 is de lokale CSV-knopkandidaat. De directe LAN-controle naar `192.168.88.253:8123` liep opnieuw in timeout; Home Assistant [via Tailscale](http://homeassistant.tail582404.ts.net:8123/hassio/ingress/350f0e24_crems_energy) antwoordde met HTTP 200. Dit is geen nieuwe geauthenticeerde versie-/statuscontrole. Actuele Pi-browser-, LAN-, herstart-, prestatie- en rollbackgates staan in `TASKS.md`.
 
 ## Structuur
 
@@ -24,6 +24,10 @@ De webapp bevat Energiepaspoort v2, batterijrapport v3 en persoonlijke contractv
 - `research`: externe broncode en audits, niet opgenomen in builds.
 
 De files `REQUIREMENTS.md`, `ARCHITECTURE.md`, `PLAN.md`, `TASKS.md` en `REVIEW.md` vormen het blijvende projectgeheugen voor de architect/implementer-workflow.
+
+Start bij de [documentatie-index](docs/README.md) voor handleidingen, research, reviews en historische plannen. De concrete vervolgvolgorde staat in [PLAN.md](PLAN.md).
+
+De [repositorykaart](docs/guides/repository-map.md) beschrijft mapgrenzen, runtimeketens en geschikte code-ingangen. De repo-skill [crems-workflow](.agents/skills/crems-workflow/SKILL.md) routeert naar bestaande procedures; [Jev-onderzoek](docs/research/skill-routing-research.md) legt de keuze voor lokale routing vast. `pnpm check:structure` controleert metadata, workspacegrenzen, skillverwijzingen en package-exports zonder persoonlijke runtimeopslag te lezen.
 
 ## Lokaal starten
 

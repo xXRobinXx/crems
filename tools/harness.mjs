@@ -6,12 +6,15 @@ import { spawnSync } from 'node:child_process';
 
 export function parseTasks(markdown) {
   const tasks = new Map();
+  const defined = new Set();
   let current;
   for (const line of markdown.split(/\r?\n/)) {
     const heading = line.match(/^### (?:Task (\d{3})|(H\d{3})) — (.+)$/);
     if (heading) {
-      current = { id: heading[1] ?? heading[2], title: heading[3], status: 'UNKNOWN' };
-      tasks.set(current.id, current);
+      const id = heading[1] ?? heading[2];
+      // Later scope/history headings must not replace the authoritative first task.
+      current = defined.has(id) ? undefined : { id, title: heading[3], status: 'UNKNOWN' };
+      if (current) { tasks.set(id, current); defined.add(id); }
     } else if (/^#{1,6} /.test(line)) current = undefined;
     const status = line.match(/^(?:\*\*)?Status:(?:\*\*)?\s*(.+)$/);
     if (current && status) current.status = status[1];
@@ -26,19 +29,31 @@ export function parseTasks(markdown) {
 
 // Hash source/configuration only. Never read local datasets, secrets or generated output.
 const skipped = new Set(['node_modules', 'dist', 'data', '.git', '.harness', '.pnpm-store']);
+export const fingerprintRootFiles = [
+  'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'tsconfig.base.json',
+  'AGENTS.md', 'REQUIREMENTS.md', 'ARCHITECTURE.md', 'AGENT_PLAYBOOK.md', 'TASKS.md',
+  'AGENT_A_ARCHITECT_REVIEWER.md', 'AGENT_B_IMPLEMENTER.md', 'AGENT_C_UX_BROWSER_QA.md',
+  'repository.yaml', '.dockerignore', '.gitignore',
+  'PLAN.md', 'README.md', 'docs/README.md',
+  'docs/guides/repository-map.md', 'docs/harness.md', 'docs/release-home-assistant.md',
+  'docs/central-storage-plan.md', 'docs/task-037-haos-app.md', 'docs/research/skill-routing-research.md',
+];
 export async function fingerprint(root) {
   const files = [];
-  async function walk(dir) {
-    for (const entry of await readdir(resolve(root, dir), { withFileTypes: true })) {
+  async function walk(dir, optional = false) {
+    let entries;
+    try { entries = await readdir(resolve(root, dir), { withFileTypes: true }); }
+    catch (error) { if (optional && error.code === 'ENOENT') return; throw error; }
+    for (const entry of entries) {
       if (entry.isSymbolicLink() || skipped.has(entry.name) || entry.name.startsWith('.env')) continue;
       const path = `${dir}/${entry.name}`;
       if (entry.isDirectory()) await walk(path);
-      else if (/\.(?:[cm]?[jt]sx?|json|ya?ml|css|html)$/.test(entry.name)) files.push(path);
+      else if (entry.name === 'Dockerfile' || /\.(?:[cm]?[jt]sx?|json|ya?ml|css|html|ps1|md)$/.test(entry.name)) files.push(path);
     }
   }
   for (const dir of ['apps', 'packages', 'tools']) await walk(dir);
-  files.push('package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'tsconfig.base.json',
-    'AGENTS.md', 'REQUIREMENTS.md', 'ARCHITECTURE.md', 'AGENT_PLAYBOOK.md', 'TASKS.md');
+  for (const dir of ['.github/workflows', 'crems', '.agents/skills']) await walk(dir, true);
+  files.push(...fingerprintRootFiles);
   const hash = createHash('sha256');
   for (const file of files.sort()) {
     const bytes = await readFile(resolve(root, file));
@@ -47,7 +62,7 @@ export async function fingerprint(root) {
   return hash.digest('hex');
 }
 
-export const checks = ['test:harness', 'build', 'test', 'typecheck'];
+export const checks = ['test:harness', 'check:structure', 'build', 'test', 'typecheck'];
 export function releaseGate(evidence, hash, review, browser) {
   const reasons = [];
   if (!evidence || evidence.fingerprint !== hash || evidence.stable !== true)

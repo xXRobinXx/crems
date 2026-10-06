@@ -26,6 +26,14 @@ Home Assistant history → raw transport → pure W/tijd-normalisatie → begren
 
 ## Decisions
 
+### ADR-012 — Credentialvrije lokale contractcatalogus
+
+**Aanvulling (geautoriseerde uitbreiding 4 oktober):** alle 18 leveranciers van de upstreamregistry worden opgenomen. Een onderhoudsimport uit een vastgelegde openbare be_price_cards-revisie normaliseert particuliere feiten naar gebundelde TypeScript-data, zonder upstreamruntime of persoonlijke gegevens. Community-extractiestatus is zichtbaar; ontbrekende actuele kaarten blijven historisch. Variabele gepubliceerde prijzen leveren uitsluitend expliciet gelabelde constante-prijsscenario's. Dynamische, tijdvak- en index-only contracten worden getoond maar niet tot een jaarprijs gereduceerd. Professionele kaarten en onduidelijke eenheden/btwbasis worden geweigerd. Importeur en productiecatalogus worden onafhankelijk getest.
+
+**Decision (expliciete gebruikersopdracht 4 oktober 2026):** een read-only bridge-GET levert versieerbare publieke tariefkaartsnapshots; pure vergelijking in core draait in de browser zonder verbruiksgegevens te versturen. De eerste gecontroleerde snapshot is EnergyVision 3 jaar vast, Vlaanderen, oktober 2026. Bron-PDF, digest, aanbodmaand, btwbasis en controledatum blijven onderdeel van de snapshot. Aanbodactualiteit is de maand van de kaart en niet de looptijd van een al getekend contract.
+
+**Consequence:** buiten de aanbodmaand wordt geen actuele nieuwe jaarberekening aangeboden. Vaste afname en vaste vergoeding zijn afzonderlijk controleerbaar; variabele injectie wordt niet als vaste jaarvergoeding berekend. De berekening is een energiecomponentscenario, geen volledige factuur of marktbrede ranglijst. De bestaande partneradapter en toestemming blijven optioneel behouden. Publieke snapshot laden verstuurt geen postcode, jaarvolumes of persoonlijke identifiers en doet geen upstreamfetch. Automatische PDF-updates, aanvullende leveranciers en volledige regionale kosten zijn vervolgwerk, geen verborgen aannames in deze eerste versie.
+
 ### ADR-001 — Zelfstandige app
 
 **Decision:** de webapp heeft geen Home Assistant-frontenddependency.  

@@ -33,7 +33,7 @@ const bundled=await build({entryPoints:[fileURLToPath(new URL("../src/App.tsx",i
   b.onLoad({filter:/.*/,namespace:"hooks"},args=>({contents:args.path==="react"?'export const useState=(...a)=>globalThis.__batteryHooks.useState(...a); export const useRef=(...a)=>globalThis.__batteryHooks.useRef(...a); export const useMemo=(...a)=>globalThis.__batteryHooks.useMemo(...a); export const useEffect=(...a)=>globalThis.__batteryHooks.useEffect(...a);':'export const Fragment="fragment"; export const jsx=(type,props,key)=>({type,props,key}); export const jsxs=jsx;'}));
   b.onResolve({filter:/^\.\/use-(live-meter|power-history|price-history)$/},args=>({path:args.path,namespace:"live"}));
   b.onLoad({filter:/.*/,namespace:"live"},()=>({contents:'export const useLiveMeter=()=>({connected:!!globalThis.__liveReading,reading:globalThis.__liveReading??{source:"simulator",timestamp:"2026-01-01T00:00:00Z",quality:"estimated",importPowerW:0,exportPowerW:0}}); export const usePowerHistory=()=>({}); export const usePriceHistory=()=>({});'}));
-  b.onLoad({filter:/App\.tsx$/},()=>({contents:source+'\nexport {BatteryPlanner,ReleaseBatteryResult,BatteryDailyReport}; export {loadBatteryStorageState} from "./local-battery-analysis";',loader:"tsx"}));
+  b.onLoad({filter:/App\.tsx$/},()=>({contents:source+'\nexport {BatteryPlanner,ReleaseBatteryResult,BatteryDailyReport}; export {loadBatteryStorageState} from "./local-battery-analysis"; export {LocalContractCatalog} from "./LocalContractCatalog";',loader:"tsx"}));
   b.onLoad({filter:/battery-comparison\.ts$/},async args=>({contents:(await readFile(args.path,"utf8")).replace('  const reasons = batteryEligibility(quality);','  globalThis.__batteryComparisonCalls=(globalThis.__batteryComparisonCalls??0)+1;\n  const reasons = batteryEligibility(quality);'),loader:"ts"}));
 }}]});
 const app=await import(`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0]!.text).toString("base64")}`);
@@ -86,7 +86,128 @@ const compared=compareBatteryCandidates(quality,technical,assumptions);if(compar
 const saved={version:3,savedAt:"2026-09-10T00:00:00Z",quality,technical,financial:{assumptions,results:compared.candidates,recommendedCapacityKwh:compared.recommendedCapacityKwh}};
 const storage=()=>{const data=new Map<string,string>([["crems.battery-analysis.v3",JSON.stringify(saved)]]);return{data,getItem:(k:string)=>data.get(k)??null,setItem:(k:string,v:string)=>void data.set(k,v),removeItem:(k:string)=>void data.delete(k)};};
 const csv="Van (datum);Van (tijdstip);Tot (datum);Tot (tijdstip);EAN-code;Meter;Metertype;Register;Volume;Eenheid;Validatiestatus;Omschrijving\n01-06-2026;00:00:00;01-06-2026;00:15:00;;;synthetisch;Injectie Dag;1,0;kWh;Uitgelezen;\n";
+test("lokale catalogus laadt zonder persoonlijke invoer en rekent alleen de gecontroleerde afnamecomponent",async()=>{
+  const originalFetch=globals.fetch,OriginalDate=globals.Date;
+  let calls=0;
+  const fixture={schemaVersion:1,cards:[{id:"synthetic",supplier:"Synthetic",name:"Synthetic fixed",region:"Flanders",tariff:"fixed",contractMonths:36,publicationMonth:"2026-10",checkedOn:"2026-10-04",sourceUrl:"https://example.com/card.pdf",sourceSha256:"a".repeat(64),vatPercent:6,annualFeeEur:75,importDayCtKwh:13.57,importNightCtKwh:13.57,injection:{kind:"monthly-indexed",indicativeCtKwh:3.27,minimumCtKwh:1,formula:"Synthetic index"}}]};
+  globals.Date=class extends OriginalDate{constructor(value?:any){super(value??"2026-10-04T12:00:00Z");}};
+  globals.fetch=async(url:any,init:any)=>{calls++;assert.equal(url,"api/contracts/local");assert.equal(init.method,"GET");assert.equal(init.body,undefined);return new Response(JSON.stringify(fixture));};
+  const h=host(app.LocalContractCatalog);
+  const input={postalCode:"9000",region:"Flanders",annualDayKwh:1000,annualNightKwh:2500,annualInjectionDayKwh:100,annualInjectionNightKwh:50,tariff:"i",householdSize:4,directDebit:false};
+  try{
+    assert.match(text(h.render({input})),/Tariefkaarten laden/);h.flush();
+    await waitFor(()=>text(h.render({input})).includes("Synthetic fixed"));
+    const tree=h.render({input});assert.match(text(tree),/549,95/);assert.match(text(tree),/Injectievergoeding niet berekend/);assert.match(text(tree),/gecontroleerd 2026-10-04/);
+    assert.equal(find(tree,n=>n.type==="a").props.href,"https://example.com/card.pdf");
+    assert.match(text(h.render({input:{...input,postalCode:"1000",region:"Brussels"}})),/Brussel.*nog geen tariefkaart/);
+    assert.equal(calls,1);assert.doesNotMatch(text(h.render({input:{...input,annualDayKwh:0,annualNightKwh:0}})),/549,95/);
+    assert.equal(button(h.render({input:{...input,annualDayKwh:0,annualNightKwh:0}}),"Haal aanbiedingen op").props.disabled,true);
+    button(h.render({input}),"Haal aanbiedingen op").props.onClick();
+    assert.match(text(h.render({input})),/Aanbiedingen ophalen/);h.flush();
+    await waitFor(()=>text(h.render({input})).includes("Synthetic fixed"));
+    assert.equal(calls,2);assert.match(text(h.render({input})),/549,95/);
+    assert.doesNotMatch(text(h.render({input})),/API.*niet geconfigureerd/);
+    globals.Date=class extends OriginalDate{constructor(value?:any){super(value??"2026-11-01T12:00:00Z");}};
+    assert.match(text(h.render({input})),/Verouderde aanbodkaart/);assert.doesNotMatch(text(h.render({input})),/549,95/);
+  }finally{h.dispose();globals.fetch=originalFetch;globals.Date=OriginalDate;}
+});
+
+test("lokale catalogus toont fouten en een echte retry, en negeert een laat antwoord na unmount",async()=>{
+  const originalFetch=globals.fetch;let mode="failure",calls=0,lateResolve:((value:any)=>void)|undefined;
+  globals.fetch=async()=>{calls++;if(mode==="late")return new Promise(resolve=>{lateResolve=resolve;});return new Response(mode==="failure"?"synthetic failure":'{"schemaVersion":1,"cards":[]}',{status:mode==="failure"?503:200});};
+  const h=host(app.LocalContractCatalog),input={postalCode:"1000"};
+  try{
+    h.render({input});h.flush();await waitFor(()=>text(h.render({input})).includes("Probeer tariefkaarten opnieuw"));
+    mode="success";button(h.render({input}),"Probeer tariefkaarten opnieuw").props.onClick();h.render({input});h.flush();
+    await waitFor(()=>text(h.render({input})).includes("nog geen tariefkaart"));assert.equal(calls,2);
+    h.dispose();mode="late";const unmounted=host(app.LocalContractCatalog);unmounted.render({input});unmounted.flush();unmounted.dispose();
+    lateResolve!(new Response('{"schemaVersion":1,"cards":[]}'));await new Promise(resolve=>setTimeout(resolve,0));
+    assert.match(text(unmounted.render({input})),/Tariefkaarten laden/);
+  }finally{h.dispose();globals.fetch=originalFetch;}
+});
+test("leveranciersfilters, regionale dekking en volgende kaarten werken zonder invoerupload; scenario en ontbrekende prijs blijven verschillend",async()=>{
+  const originalFetch=globals.fetch,OriginalDate=globals.Date;let calls=0;
+  const base={id:"base",supplier:"Synthetic",name:"Synthetic fixed",region:"Flanders",tariff:"fixed",contractMonths:0,publicationMonth:"2026-10",checkedOn:"2026-10-04",sourceUrl:"https://example.com/card.pdf",sourceSha256:"a".repeat(64),vatPercent:6,annualFeeEur:75,importDayCtKwh:13.57,importNightCtKwh:13.57,importSingleCtKwh:13.57,priceBasis:"fixed",verification:"community-extracted",archiveUrl:"https://github.com/example/cards",conditions:"Synthetic conditions",formula:"Synthetic formula",injection:{kind:"unavailable",indicativeCtKwh:null,minimumCtKwh:null,formula:"No injection data"}};
+  const cards=[...Array.from({length:22},(_,i)=>({...base,id:`fixed-${i}`,name:`Fixed ${String(i).padStart(2,'0')}`,region:i===21?'Brussels':'Flanders'})),{...base,id:'variable',supplier:'Variable',name:'Variable contract',tariff:'variable',priceBasis:'published-variable'},{...base,id:'dynamic',supplier:'Dynamic',name:'Dynamic contract',tariff:'dynamic',priceBasis:'interval-required',importDayCtKwh:null,importNightCtKwh:null,importSingleCtKwh:null},{...base,id:'unknown',supplier:'Unknown',name:'Unknown VAT',vatPercent:null}];
+  const fixture={schemaVersion:2,archiveRevision:'a'.repeat(40),publicationMonth:'2026-10',cards,suppliers:[['Synthetic',22],['Variable',1],['Dynamic',1],['Unknown',1],['DATS 24',0]].map(([name,currentCards],i)=>({id:`s${i}`,name,currentCards,note:currentCards?'Synthetic coverage':'Geen actuele kaart'}))};
+  globals.Date=class extends OriginalDate{constructor(value?:any){super(value??"2026-10-04T12:00:00Z");}};
+  globals.fetch=async(url:any,init:any)=>{calls++;assert.equal(url,'api/contracts/local');assert.equal(init.body,undefined);return new Response(JSON.stringify(fixture));};
+  const h=host(app.LocalContractCatalog),input={postalCode:'9000',annualDayKwh:1000,annualNightKwh:2500,annualInjectionDayKwh:0,annualInjectionNightKwh:0};
+  const choose=(index:number,value:string)=>nodes(h.render({input})).filter(n=>n.type==='select')[index].props.onChange({target:{value}});
+  try{
+    h.render({input});h.flush();await waitFor(()=>text(h.render({input})).includes('Fixed 00'));
+    assert.equal(nodes(h.render({input})).filter(n=>n.type==='article').length,20);
+    button(h.render({input}),'Toon nog 4 contracten').props.onClick();assert.equal(nodes(h.render({input})).filter(n=>n.type==='article').length,24);
+    choose(0,'Variable');assert.match(text(h.render({input})),/549,95.*variabel scenario/);
+    choose(1,'dynamic');assert.equal(nodes(h.render({input})).filter(n=>n.type==='article').length,0);
+    choose(0,'all');assert.match(text(h.render({input})),/vereist interval- of maandindexgegevens/);assert.doesNotMatch(text(h.render({input})),/549,95/);
+    choose(1,'all');choose(0,'Unknown');assert.match(text(h.render({input})),/Btwbasis onvoldoende/);assert.doesNotMatch(text(h.render({input})),/549,95/);
+    choose(0,'DATS 24');assert.match(text(h.render({input})),/nog geen tariefkaart/);
+    choose(0,'all');const brussels=h.render({input:{...input,postalCode:'1000'}});assert.equal(nodes(brussels).filter(n=>n.type==='article').length,1);assert.match(text(brussels),/Brussel/);assert.doesNotMatch(text(brussels),/Vlaanderen · Vast/);assert.equal(calls,1);
+  }finally{h.dispose();globals.fetch=originalFetch;globals.Date=OriginalDate;}
+});
+
+test("contract-CSV opent de kiezer direct, behoudt annuleren en analyseert een selectie lokaal", async()=>{
+  globals.window={localStorage:{getItem:()=>null}};
+  const h=host(app.App);let contract:ReturnType<typeof host>|undefined;
+  try {
+    button(h.render(),"4. Contract").props.onClick();
+    const page=find(h.render(),n=>typeof n.type==="function"&&n.type.name==="ContractComparisonPage");
+    contract=host(page.type);
+    const tree=contract.render(page.props);
+    const input=find(tree,n=>n.type==="input"&&n.props.type==="file");
+    assert.equal(input.props.accept,".csv,text/csv");
+    let clicks=0;input.props.ref.current={click:()=>{clicks++;}};
+    button(tree,"Kies Fluvius-CSV voor jaarverbruik").props.onClick();
+    assert.equal(clicks,1);
+    assert.equal(button(h.render(),"4. Contract").props["aria-current"],"page");
+    input.props.onChange({target:{files:[]}});
+    assert.equal(button(h.render(),"4. Contract").props["aria-current"],"page");
+    const target={files:[{size:csv.length,stream:()=>new Blob([csv]).stream()}],value:"synthetisch.csv"};
+    input.props.onChange({target});
+    assert.equal(target.value,"");
+    assert.equal(button(h.render(),"4. Contract").props["aria-current"],"page");
+    assert.match(text(contract.render(page.props)),/CSV lokaal lezen/);
+    await waitFor(()=>text(contract!.render(page.props)).includes("geen volledig betrouwbaar jaar"));
+    assert.doesNotMatch(text(contract.render(page.props)),/Vul dag\/nachtwaarden in/);
+    input.props.onChange({target:{files:[{size:10,text:async()=>"invalid csv"}],value:"broken.csv"}});
+    await waitFor(()=>nodes(contract!.render(page.props)).some(n=>n.props?.role==='alert'));
+    assert.equal(button(h.render(),"4. Contract").props["aria-current"],"page");
+  }finally{contract?.dispose();h.dispose();delete globals.window;}
+});
 const analyzer=createFluviusPreviewAnalyzer();analyzer.push(csv);const checked=mapCsvPreview({ok:true,analyzed:analyzer.finish()});
+
+test('contractselectie ruimt een actieve stream op bij verlaten en werkt na effectherstart',async()=>{
+  globals.window={localStorage:{getItem:()=>null}};const h=host(app.App);let contract:ReturnType<typeof host>|undefined;
+  try{
+    button(h.render(),'4. Contract').props.onClick();const page=find(h.render(),n=>typeof n.type==='function'&&n.type.name==='ContractComparisonPage');
+    contract=host(page.type);contract.render(page.props);contract.flush();contract.replay();
+    let cancelled=0;
+    const input=find(contract.render(page.props),n=>n.type==='input'&&n.props.type==='file');
+    input.props.onChange({target:{files:[{size:100,stream:()=>new ReadableStream({cancel(){cancelled++;}})}],value:'synthetic.csv'}});
+    assert.match(text(contract.render(page.props)),/CSV lokaal lezen/);
+    contract.dispose();assert.equal(cancelled,1);
+    await new Promise(resolve=>setTimeout(resolve,0));
+    assert.doesNotMatch(text(contract.render(page.props)),/CSV gecontroleerd\./);
+  }finally{h.dispose();delete globals.window;}
+});
+
+test('contractselectie annuleert een trage stream en neemt een echt volledig jaar expliciet over',async()=>{
+  globals.window={localStorage:{getItem:()=>null}};const h=host(app.App);let contract:ReturnType<typeof host>|undefined;
+  try{
+    button(h.render(),'4. Contract').props.onClick();const page=find(h.render(),n=>typeof n.type==='function'&&n.type.name==='ContractComparisonPage');let updated:any;const props={...page.props,onMarketInput:(value:any)=>{updated=value;}};contract=host(page.type);contract.render(props);contract.flush();
+    const choose=(file:any)=>find(contract!.render(props),n=>n.type==='input'&&n.props.type==='file').props.onChange({target:{files:[file],value:'synthetic.csv'}});
+    let cancelled=0;choose({size:100,stream:()=>new ReadableStream({cancel(){cancelled++;}})});
+    assert.match(text(contract.render(props)),/CSV lokaal lezen/);button(contract.render(props),'Annuleer CSV-controle').props.onClick();assert.match(text(contract.render(props)),/geannuleerd/);assert.equal(cancelled,1);
+    const fmt=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Brussels',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
+    const stamp=(n:number)=>{const p=Object.fromEntries(fmt.formatToParts(new Date(n)).map(x=>[x.type,x.value]));return `${p.day}-${p.month}-${p.year};${p.hour}:${p.minute}:00`;};
+    const rows=[csv.split('\n')[0]];for(let n=Date.UTC(2025,0,1);n<Date.UTC(2026,0,1);n+=900000){const from=stamp(n),to=stamp(n+900000);for(const [register,volume] of [['Afname Dag','0,1'],['Afname Nacht','0,2'],['Injectie Dag','0,01'],['Injectie Nacht','0,02']])rows.push(`${from};${to};;;synthetisch;${register};${volume};kWh;Uitgelezen;`);}
+    const blob=new Blob([rows.join('\n')]);choose({size:blob.size,stream:()=>blob.stream()});assert.equal(updated,undefined);
+    for(let i=0;i<3000&&!text(contract.render(props)).includes('CSV gecontroleerd.');i++)await new Promise(resolve=>setTimeout(resolve,5));
+    const tree=contract.render(props);assert.match(text(tree),/CSV gecontroleerd\./);assert.equal(updated,undefined);button(tree,'Vul dag/nachtwaarden in').props.onClick();
+    assert.ok(Math.abs(updated.annualDayKwh-3504)<0.00001);assert.ok(Math.abs(updated.annualNightKwh-7008)<0.00001);assert.ok(Math.abs(updated.annualInjectionDayKwh-350.4)<0.00001);assert.ok(Math.abs(updated.annualInjectionNightKwh-700.8)<0.00001);assert.equal(updated.postalCode,page.props.marketInput.postalCode);assert.equal(button(h.render(),'4. Contract').props['aria-current'],'page');
+  }finally{contract?.dispose();h.dispose();delete globals.window;}
+});
 
 test("profielbewaring legt browserkopie en Pi-toegang uit vóór de expliciete actie en verstuurt geen CSV", async () => {
   const originalFetch=globalThis.fetch;

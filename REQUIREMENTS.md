@@ -19,6 +19,8 @@ Een zelfstandige, gebruiksvriendelijke energie-app voor Belgische huishoudens di
 - FR-003a: herken het bewezen Fluvius-schema met puntkommascheiding, lokale `dd-MM-yyyy` datum/tijdvelden, vier afname-/injectieregisters, komma-decimale kWh en expliciete validatiestatus; gevoelige identificatievelden worden niet getoond of opgeslagen.
 - FR-004: laat een gebruiker zijn contract invoeren en controleren;
 - FR-005: vergelijk contracten transparant op het persoonlijke profiel;
+- FR-005b (gebruikersopdracht 4 oktober 2026): neem alle leveranciers uit de openbare integratieregistry op, met particuliere contracten per regio, herleidbare extractiebron en zichtbare ontbrekende of historische kaarten. Onderscheid vaste componentkosten, scenario's bij gepubliceerde variabele prijzen en contracten die interval-/indexdata vereisen. Community-extracties zijn geen onafhankelijke broncontrole of volledige marktdekking.
+- FR-005a (gebruikersopdracht 4 oktober 2026): bied een credentialvrije lokale catalogus uit gecontroleerde publieke Belgische tariefkaarten. Toon leverancier, regio, bron, aanbodmaand, controledatum en actualiteit. Eerste dekking mag beperkt zijn, maar ontbrekende regio's of prijscomponenten blijven zichtbaar. Jaarberekeningen onderscheiden vaste afname/vergoeding van variabele injectie en volledige factuurkosten; persoonsgegevens worden voor deze lokale vergelijking niet extern verstuurd.
 - FR-006: toon alleen berekende adviezen wanneer voldoende echte data bestaat;
 - FR-007: werk als zelfstandige fullscreen webapp zonder Home Assistant-frontenddependency.
 - FR-008: toon de verbruiksgrafiek uitsluitend uit echte, getimede Home Assistant-history wanneer die bron beschikbaar is; een statische demo- of prijsserie mag niet als actuele of historische meting worden getoond.
@@ -67,7 +69,9 @@ Een zelfstandige, gebruiksvriendelijke energie-app voor Belgische huishoudens di
 |---|---|
 | Module bewezen | read-only Home Assistant live data, daghistory, echte prijsreeks, streaming Fluvius-controle, veilige profielaggregaten en pure batterij-/contractberekeningen |
 | Beschikbaar in lokale webapp | expliciet Energiepaspoort v2, duurzaam batterijrapport v3 en persoonlijke vergelijking van twee zelf ingevoerde vaste/variabele energiecomponenten |
-| Beperkt deploymentbewijs | Home Assistant-add-on 0.1.13 draait volgens actuele Supervisor-info van 1 oktober; actuele Pi-browser-/LAN-gates in Task 061 open |
+| Beperkt deploymentbewijs | Home Assistant-add-on 0.1.14 is volgens het deploymentrapport van 2 oktober installed/started; lokale kandidaat 0.1.15 en actuele Pi-browser-/LAN-/herstart-/rollbackgates in Task 061 open |
 | Niet vrijgegeven | live marktbrede contractkeuze zonder partnerrechten/configuratie, bewaarde contractvergelijking en volledige financiële offerte |
 
 Een modulegoedkeuring is geen eindgebruikersrelease. Zichtbare functionaliteit is pas vrijgegeven na een volledige browsergate van de gebruikersreis.
+
+Documentatiebaseline 2 oktober: [laatste vastgelegde deploymentcontrole](docs/task-061-deployment014.md); deze cleanup heeft geen nieuwe externe controle uitgevoerd. Functionele requirements en ADR's zijn niet gewijzigd.
