@@ -1,5 +1,9 @@
 # Tasks
 
+## Task 061 — browserbevindingen contractpresentatie herstellen — 6 oktober 2026
+
+Gebruiker autoriseert vervolgwerk na browsercontrole. Root enige productiewriter; write set: apps/web/src/contract-csv.ts, apps/web/src/local-contract-catalog.ts, apps/web/test/contract-csv.test.ts, apps/web/test/local-contract-catalog.test.ts, apps/web/test/battery-flow-structure.test.ts, TASKS.md en docs/reviews/task-061-contract-presentation.md. Bewijs: native jaar-CSV toont floating-pointstaarten in vier formuliervelden; onbereikbare lokale bridge toont “Failed to fetch” (QA-rapport .harness/browser-20261006/report.md). Acceptance: uitsluitend expliciete CSV-overname rondt formulierjaarvolumes af op maximaal zes decimalen (0,000001 kWh), bron/kwaliteitsgates ongewijzigd; transport- en bodyleesfouten tonen Nederlandse veilige herhaaltekst zonder technische foutdetails; abort blijft abort. Regressies en actuele browserherhaling vereist, geen nieuwe opslag/provider/dependency of Pi-uitrol. Bestaande volledige release-/review-/Pi-gates blijven open; geen tweede actieve taak.
+
 ## Task 061 — aanbiedingenknop zonder partnerconfiguratie — 6 oktober 2026
 
 Gebruiker vraagt dat de knop werkt in plaats van “api niet geconfigureerd”. Root enige productiewriter; write set: apps/web/src/App.tsx, apps/web/src/LocalContractCatalog.tsx, apps/web/test/battery-flow-structure.test.ts, TASKS.md en docs/reviews/task-061-contract-button.md. De gewone aanbiedingenknop gebruikt de relatieve lokale catalogus-GET en bestaande lokale berekening; externe partneraanvraag blijft afzonderlijk en expliciet benoemd. Geen credentials, verzonnen providerresultaten, invoerupload of Pi-uitrol. Acceptance: geldige postcode/volumes, klik→loading→lokale kaarten/componentbedragen, nul providerPOST; ongeldige invoer blokkeert klik; bestaande fout/retry/historiegates blijven. Tests/build vereist; onafhankelijke review en browsergate open.

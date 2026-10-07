@@ -9,4 +9,7 @@ export const contractCsvTotals=(preview:CsvPreview|undefined):ContractCsvTotals|
   const registerPeriods=Object.values(preview.registerCoverage);if(registerPeriods.some(period=>!period||Date.parse(period.end)-Date.parse(period.start)<364*24*60*60*1000||Math.abs(Date.parse(period.start)-Date.parse(preview.period!.start))>15*60*1000||Math.abs(Date.parse(period.end)-(Date.parse(preview.period!.end)+15*60*1000))>15*60*1000))return;
   return {annualDayKwh:preview.registerKwh.importDay,annualNightKwh:preview.registerKwh.importNight,annualInjectionDayKwh:preview.registerKwh.exportDay,annualInjectionNightKwh:preview.registerKwh.exportNight,period:preview.period,importKwh:preview.registerKwh.importDay+preview.registerKwh.importNight,exportKwh:preview.registerKwh.exportDay+preview.registerKwh.exportNight};
 };
-export const applyContractCsvTotals=(input:ContractMarketInput,totals:ContractCsvTotals):ContractMarketInput=>({...input,annualDayKwh:totals.annualDayKwh,annualNightKwh:totals.annualNightKwh,annualInjectionDayKwh:totals.annualInjectionDayKwh,annualInjectionNightKwh:totals.annualInjectionNightKwh});
+// Only the explicit form handoff rounds accumulated floating-point residue.
+// Keep the checked source totals and manually entered volumes unchanged.
+const formKwh=(value:number)=>Number(value.toFixed(6));
+export const applyContractCsvTotals=(input:ContractMarketInput,totals:ContractCsvTotals):ContractMarketInput=>({...input,annualDayKwh:formKwh(totals.annualDayKwh),annualNightKwh:formKwh(totals.annualNightKwh),annualInjectionDayKwh:formKwh(totals.annualInjectionDayKwh),annualInjectionNightKwh:formKwh(totals.annualInjectionNightKwh)});

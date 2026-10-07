@@ -19,3 +19,12 @@ test("unavailable, malformed or excessive local catalog gets a safe error rather
     await assert.rejects(loadLocalContractCatalog(undefined, async () => response), /lokale tariefkaarten/);
   }
 });
+
+test("transport en afgebroken response verbergen technische foutdetails; abort blijft herkenbaar",async()=>{
+  const failure=new TypeError("Failed to fetch sensitive upstream detail");
+  await assert.rejects(loadLocalContractCatalog(undefined,async()=>{throw failure;}),error=>error instanceof Error&&error.message==="De lokale tariefkaarten konden niet worden geladen. Controleer je verbinding en probeer opnieuw.");
+  const response=new Response("unused");response.text=async()=>{throw failure;};
+  await assert.rejects(loadLocalContractCatalog(undefined,async()=>response),/Controleer je verbinding/);
+  const controller=new AbortController();controller.abort();const aborted=new DOMException("aborted","AbortError");
+  await assert.rejects(loadLocalContractCatalog(controller.signal,async()=>{throw aborted;}),error=>error===aborted);
+});

@@ -24,3 +24,11 @@ test("vult alleen de vier jaarvolumes en behoudt overige vergelijkingsinvoer",()
   const initial:ContractMarketInput={postalCode:"1000",region:"Brussels",annualDayKwh:0,annualNightKwh:0,annualInjectionDayKwh:0,annualInjectionNightKwh:0,tariff:"f",householdSize:3,directDebit:true};
   assert.deepEqual(applyContractCsvTotals(initial,contractCsvTotals(preview())!),{...initial,annualDayKwh:1000,annualNightKwh:500,annualInjectionDayKwh:200,annualInjectionNightKwh:100});
 });
+
+test("CSV-overname verwijdert optelruis, behoudt zes decimalen en muteert geen bronwaarden",()=>{
+  const input:ContractMarketInput={postalCode:"9000",region:"Flanders",annualDayKwh:0,annualNightKwh:0,annualInjectionDayKwh:0,annualInjectionNightKwh:0,tariff:"f",householdSize:2,directDebit:false};
+  const totals=Object.freeze({...contractCsvTotals(preview())!,annualDayKwh:3503.9999999979086,annualNightKwh:7007.999999995817,annualInjectionDayKwh:350.3999999998263,annualInjectionNightKwh:0.1234564});
+  const result=applyContractCsvTotals(input,totals);
+  assert.deepEqual(result,{...input,annualDayKwh:3504,annualNightKwh:7008,annualInjectionDayKwh:350.4,annualInjectionNightKwh:0.123456});
+  assert.equal(totals.annualDayKwh,3503.9999999979086);assert.equal(input.annualDayKwh,0);
+});
