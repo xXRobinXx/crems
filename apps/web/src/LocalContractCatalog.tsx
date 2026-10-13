@@ -28,7 +28,10 @@ export function LocalContractCatalog({ input }: { input: ContractMarketInput }) 
   const region = regionForPostalCode(input.postalCode);
   const catalog = state.status === "success" ? state.catalog : undefined;
   const suppliers = catalog?.suppliers?.map(s => s.name) ?? [...new Set(catalog?.cards.map(c => c.supplier) ?? [])];
-  const cards = (catalog?.cards ?? []).filter(card => (!region || card.region === region) && (supplier === "all" || supplier === card.supplier) && (tariff === "all" || tariff === card.tariff)).sort((a,b) => a.supplier.localeCompare(b.supplier) || a.name.localeCompare(b.name) || a.region.localeCompare(b.region));
+  const now = new Date();
+  const cards = (catalog?.cards ?? []).filter(card => (!region || card.region === region) && (supplier === "all" || supplier === card.supplier) && (tariff === "all" || tariff === card.tariff))
+    .map(card => ({ card, status: localCardStatus(card, now), estimate: region ? estimateLocalContract(card, region, input, now) : undefined }))
+    .sort((a,b) => (a.estimate?.importAndFeeEur ?? Infinity) - (b.estimate?.importAndFeeEur ?? Infinity) || a.card.supplier.localeCompare(b.card.supplier) || a.card.name.localeCompare(b.card.name) || a.card.region.localeCompare(b.card.region) || a.card.id.localeCompare(b.card.id));
   return <section className="contract-results local-contract-catalog" aria-label="Lokale contractcatalogus">
     <h2>Publieke tariefkaarten, lokaal berekend</h2>
     <p>Je postcode en verbruik blijven in deze browser. De catalogus omvat de leveranciers uit de openbare integratie; ontbrekende actuele kaarten blijven zichtbaar. Geen garantie op volledige marktdekking of het goedkoopste aanbod.</p>
@@ -38,14 +41,12 @@ export function LocalContractCatalog({ input }: { input: ContractMarketInput }) 
     {state.status === "error" && <><p role="alert">{state.message}</p><button type="button" onClick={() => setAttempt(value => value + 1)}>Probeer tariefkaarten opnieuw</button></>}
     {catalog && <>
       <div className="form-grid"><label>Leverancier<select value={supplier} onChange={event=>{setSupplier(event.target.value);setLimit(20);}}><option value="all">Alle leveranciers</option>{suppliers.map(name=><option key={name} value={name}>{name}</option>)}</select></label><label>Prijssoort in lokale catalogus<select value={tariff} onChange={event=>{setTariff(event.target.value);setLimit(20);}}><option value="all">Alle prijssoorten</option>{Object.entries(tariffNames).map(([value,name])=><option key={value} value={value}>{name}</option>)}</select></label></div>
-      <p role="status">{cards.length} contract-/regiokaarten{region ? ` voor ${regionNames[region]}` : " · vul je postcode in voor jouw gewest"}. Alfabetisch weergegeven; vaste kosten en variabele scenario's zijn geen gezamenlijke ranglijst.</p>
+      <p role="status">{cards.length} contract-/regiokaarten{region ? ` voor ${regionNames[region]}` : " · vul je postcode in voor jouw gewest"}. Van goedkoop naar duur op afname + vaste vergoeding per jaar. Aanbiedingen zonder berekenbaar bedrag staan onderaan; bij gelijke of ontbrekende bedragen alfabetisch. Variabele bedragen blijven scenario's, geen gegarandeerde jaarprijs.</p>
       {catalog.suppliers && <details className="report-details"><summary>Dekking van alle {catalog.suppliers.length} leveranciers</summary><ul>{catalog.suppliers.map(s=><li key={s.id}><strong>{s.name}</strong>: {s.currentCards} kaarten in archiefmaand {catalog.publicationMonth}, over alle gewesten. {s.note}</li>)}</ul><p>Community-archiefrevisie {catalog.archiveRevision}. Een actuele kaart is geen bewijs dat dit product vandaag nog nieuw afsluitbaar is.</p></details>}
       <p>Variabele bedragen zijn scenario's als de gepubliceerde prijzen een heel jaar gelijk zouden blijven. Dynamische en tijdvakcontracten vereisen passende interval- en indexgegevens. Kortingen, netkosten, heffingen en overige factuurcomponenten zijn niet inbegrepen.</p>
     </>}
     {catalog && cards.length === 0 && <p role="status">Voor {region ? regionNames[region] : "dit gewest"} en deze filters bevat de lokale catalogus nog geen tariefkaart.</p>}
-    {cards.slice(0,limit).map(card => {
-      const status = localCardStatus(card, new Date());
-      const estimate = region ? estimateLocalContract(card, region, input, new Date()) : undefined;
+    {cards.slice(0,limit).map(({ card, status, estimate }) => {
       const community = card.verification === "community-extracted";
       return <article key={card.id}>
         <h3>{card.supplier} · {card.name}</h3>

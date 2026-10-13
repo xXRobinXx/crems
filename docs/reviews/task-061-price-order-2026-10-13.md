@@ -1,0 +1,15 @@
+# Task 061 — standaard goedkoop naar duur
+
+Gebruikersopdracht13oktober: altijd goedkoop naar duur. Root enige productiewriter, write set vastgelegd inTASKS. FR-005c en de architectuuraanvulling leggen de expliciet gevraagde presentatie vast; geen verborgen wijziging van prijsberekeningen.
+
+LocalContractCatalog filtert de regionale/leverancier-/tariefkaarten, berekent perkaart één estimate met één renderdatum en sorteert vóór paginering op het getoonde `importAndFeeEur`. Dit is afname plus vaste vergoeding per jaar. Gelijke prijzen sorteren alfabetisch op leverancier/naam/regio en daarnaid; ontbrekende bedragen staan onder alle berekenbare bedragen. Een werkelijk berekend nulbedrag blijft nul. Historische/dynamische/ongeldige/onvoldoende kaarten krijgen geen fictieve nulprijs. Volume-/postcode-/filterwijzigingen herberekenen de volgorde automatisch. Variabele scenario's blijven gelabeld; geen volledige-factuur-/injectie- of marktgoedkoopsteclaim.
+
+Nieuwe werkelijke componentregressie controleert27kaarten, goedkoopste vóór20kaartenpaginering, gelijke vaste/variabele bedragen, zichtbaar nulbedrag, onbekende/historische bedragen achteraan, volgordeomkering bij dag/nachtvolumeaanpassing, ontbrekende postcode, vervallen maand en ongewijzigde bronarray. Bestaande regio-/filter-/retry-/privacyregressies blijven intact. Eerste testfixture was ongeldig schema1; gecorrigeerd naar een valide schema2communitycatalogus en opnieuw uitgevoerd. Productievalidators zijn niet versoepeld.
+
+Verificatie: core71/web167/bridge111, harness13, build/typecheck/structuur en diffcheck PASS. Volledige harness13oktober17:26:13–17:26:48UTC, stable=true, alle vijfexitcodes0, fingerprint `710bbaf12efa2d88d4d77a91c5d9cef501e9fb7a62bad97fe80c5fc60eb4ffcb`. Onafhankelijke reviewer herinspecteerde de herstelde fixture en productiesortering en voerde de nieuwe componentcase zelf metPASS uit: begrensde CODE APPROVED. Geen nieuwe dependencies, persoonlijke gegevensuitvoer of opslagmutatie.
+
+Browsercontrole: NOT RUN. De nieuwe implementatieopdracht is geen nieuwe expliciete browseropdracht onderAGENTS.md. Eerder uitgevoerd browserbewijs hoort bij de inmiddels geïnstalleerde0.1.16 en mag niet als bewijs voor deze nieuwe sortering gelden. Geen releaseattestatie, nieuwe tag, push of Pi-update voor deze wijziging.
+
+Handoff voor geautoriseerde QA: huidige build in een geïsoleerde localhostbridge met synthetische catalogus/jaarvolumes; 375/1280px. Controleer de eerste en vervolgpagina op niet-dalende getoonde jaarbedragen, goedkope kaarten vóór alfabetisch vroege dure/onberekenbare kaarten, volume-/postcode-/filterherordening, nul/gelijk/ontbrekend/historisch, keyboardEnter en statusuitleg. Gebruik geen persoonlijke opslagmutatie/provideraanvraag. Daarna pas releaseversion/fullchecks/APPROVED/PASS en de bestaande backup-/updateprocedure.
+
+Vervolg na expliciete opdracht om de openlijst af te werken: actuele browser-PASS staat in task-061-browser017-2026-10-13.md. Releasekandidaat 0.1.17, volledige checks stable=true met fingerprint d8d989c46f1cb3c25f922df971414e843effc84e30906490c13e1834973b9c14; bovenstaande NOT RUN beschrijft alleen de eerdere tussenstap.

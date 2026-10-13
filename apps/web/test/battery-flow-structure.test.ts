@@ -162,6 +162,32 @@ test("lokale catalogus laadt zonder persoonlijke invoer en rekent alleen de geco
   }finally{h.dispose();globals.fetch=originalFetch;globals.Date=OriginalDate;}
 });
 
+test("catalogus sorteert het getoonde bedrag vóór paginering en herordent bij gewijzigde volumes",async()=>{
+  const originalFetch=globals.fetch,OriginalDate=globals.Date;
+  const base={supplier:'AA expensive',name:'Fixed',region:'Flanders',tariff:'fixed',contractMonths:12,publicationMonth:'2026-10',checkedOn:'2026-10-04',sourceUrl:'https://example.com/card.pdf',sourceSha256:'a'.repeat(64),vatPercent:6,annualFeeEur:75,importDayCtKwh:20,importNightCtKwh:5,importSingleCtKwh:20,priceBasis:'fixed',verification:'community-extracted',archiveUrl:'https://example.com/archive',conditions:'Synthetic conditions',formula:'Synthetic formula',injection:{kind:'unavailable',indicativeCtKwh:null,minimumCtKwh:null,formula:'No injection data'}};
+  const cards=[{...base,id:'missing',supplier:'A missing',tariff:'dynamic',priceBasis:'interval-required',importDayCtKwh:null,importNightCtKwh:null,importSingleCtKwh:null},{...base,id:'old',supplier:'A old',publicationMonth:'2026-09',checkedOn:'2026-09-01',annualFeeEur:0,importDayCtKwh:0,importNightCtKwh:0},...Array.from({length:22},(_,i)=>({...base,id:`expensive-${i}`,name:`Fixed ${String(i).padStart(2,'0')}`})),{...base,id:'cheap',supplier:'ZZ cheap',annualFeeEur:100,importDayCtKwh:10,importNightCtKwh:40},{...base,id:'tie',supplier:'Tie scenario',tariff:'variable',priceBasis:'published-variable',annualFeeEur:100,importDayCtKwh:10,importNightCtKwh:40},{...base,id:'zero',supplier:'Zero',annualFeeEur:0,importDayCtKwh:0,importNightCtKwh:0}];
+  globals.Date=class extends OriginalDate{constructor(value?:any){super(value??'2026-10-13T12:00:00Z');}};
+  globals.fetch=async()=>new Response(JSON.stringify({schemaVersion:2,archiveRevision:'a'.repeat(40),publicationMonth:'2026-10',cards,suppliers:[...new Set(cards.map(card=>card.supplier))].map((name,i)=>({id:`supplier-${i}`,name,currentCards:cards.filter(card=>card.supplier===name&&card.publicationMonth==='2026-10').length,note:'Synthetic coverage'}))}));
+  const h=host(app.LocalContractCatalog),input={postalCode:'9000',annualDayKwh:1000,annualNightKwh:0,annualInjectionDayKwh:0,annualInjectionNightKwh:0};
+  const articles=(tree:any)=>nodes(tree).filter(n=>n.type==='article').map(text);
+  try{
+    h.render({input});h.flush();await waitFor(()=>text(h.render({input})).includes('ZZ cheap'));
+    let tree=h.render({input}),rows=articles(tree);
+    assert.equal(rows.length,20);assert.match(rows[0],/^Zero.*0,00/);assert.match(rows[1],/^Tie scenario.*200,00.*variabel scenario/);assert.match(rows[2],/^ZZ cheap.*200,00/);
+    assert.equal(rows.some(row=>/^A missing|^A old/.test(row)),false);
+    assert.match(text(tree),/Van goedkoop naar duur op afname \+ vaste vergoeding/);
+    button(tree,'Toon nog 7 contracten').props.onClick();rows=articles(h.render({input}));assert.equal(rows.length,27);
+    assert.match(rows.at(-2)!,/^A missing/);assert.match(rows.at(-1)!,/^A old/);
+    rows=articles(h.render({input:{...input,annualDayKwh:0,annualNightKwh:2000}}));
+    assert.match(rows[0],/^Zero/);assert.match(rows[1],/^AA expensive.*175,00/);
+    assert.ok(rows.findIndex(row=>row.startsWith('ZZ cheap'))>rows.findIndex(row=>row.startsWith('AA expensive')));
+    tree=h.render({input:{...input,postalCode:''}});rows=articles(tree);assert.match(rows[0],/^A missing/);assert.doesNotMatch(text(tree),/200,00.*\/ jaar/);
+    globals.Date=class extends OriginalDate{constructor(value?:any){super(value??'2026-11-01T12:00:00Z');}};
+    rows=articles(h.render({input}));assert.match(rows[0],/^A missing/);assert.equal(rows.some(row=>row.includes('/ jaar voor afname')),false);
+    assert.equal(cards[0].id,'missing');
+  }finally{h.dispose();globals.fetch=originalFetch;globals.Date=OriginalDate;}
+});
+
 test("lokale catalogus toont fouten en een echte retry, en negeert een laat antwoord na unmount",async()=>{
   const originalFetch=globals.fetch;let mode="failure",calls=0,lateResolve:((value:any)=>void)|undefined;
   globals.fetch=async()=>{calls++;if(mode==="late")return new Promise(resolve=>{lateResolve=resolve;});return new Response(mode==="failure"?"synthetic failure":'{"schemaVersion":1,"cards":[]}',{status:mode==="failure"?503:200});};

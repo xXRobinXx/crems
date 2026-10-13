@@ -34,6 +34,8 @@ Home Assistant history → raw transport → pure W/tijd-normalisatie → begren
 
 **Consequence:** buiten de aanbodmaand wordt geen actuele nieuwe jaarberekening aangeboden. Vaste afname en vaste vergoeding zijn afzonderlijk controleerbaar; variabele injectie wordt niet als vaste jaarvergoeding berekend. De berekening is een energiecomponentscenario, geen volledige factuur of marktbrede ranglijst. De bestaande partneradapter en toestemming blijven optioneel behouden. Publieke snapshot laden verstuurt geen postcode, jaarvolumes of persoonlijke identifiers en doet geen upstreamfetch. Automatische PDF-updates, aanvullende leveranciers en volledige regionale kosten zijn vervolgwerk, geen verborgen aannames in deze eerste versie.
 
+**Aanvulling op expliciete gebruikersopdracht 13 oktober:** standaard prijssortering gebruikt uitsluitend het getoonde `importAndFeeEur` van de bestaande lokale berekening. Eén renderdatum en één berekening per kaart dienen zowel volgorde als presentatie. Regionale/leverancier-/tarieffilters gaan vóór sorteren; paginering erna. Ontbrekende bedragen staan achter alle berekenbare bedragen, met alfabetische tie-break. Variabele scenario's blijven gelabeld en worden geen gegarandeerde vaste of netto factuurprijzen.
+
 ### ADR-001 — Zelfstandige app
 
 **Decision:** de webapp heeft geen Home Assistant-frontenddependency.  
