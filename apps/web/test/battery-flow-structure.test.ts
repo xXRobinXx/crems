@@ -8,6 +8,7 @@ import {mapCsvPreview} from "../src/csv-preview.ts";
 import {compareBatteryCandidates} from "../src/battery-comparison.ts";
 import {createBatterySimulator} from "@crems/core/battery-simulation";
 import {createBatteryDailyCollector} from "../src/battery-daily-report.ts";
+import {brusselsContractDay} from "../src/day-window.ts";
 
 const source = await readFile(new URL("../src/App.tsx", import.meta.url), "utf8");
 
@@ -80,12 +81,61 @@ test("lege navigatie legt voorwaarden uit en laat contractformulier zonder lokaa
   }finally{h.dispose();delete globals.window;}
 });
 const quality={period:{start:"2025-01-01T00:00:00Z",end:"2026-01-02T00:00:00Z"},integrityReliable:true,estimatedCount:0,gapCount:0,duplicateCount:0,overlapCount:0};
+
+test("indicatieve contractvolumes behouden herkomst na remount; nieuwe gedeelde bron erft geen oude strikte totalen",()=>{
+  globals.window={localStorage:{getItem:()=>null}};
+  const root=host(app.App);let contract:ReturnType<typeof host>|undefined;
+  try{
+    button(root.render(),'4. Contract').props.onClick();
+    const getPage=()=>find(root.render(),n=>typeof n.type==='function'&&n.type.name==='ContractComparisonPage');
+    const page=getPage();contract=host(page.type);
+    const coverage={start:'2025-01-01T00:00:00Z',end:'2026-06-07T00:00:00Z',count:1};
+    const preview:any={status:'success',period:coverage,integrityReliable:true,estimatedCount:102,gapCount:1496,duplicateCount:6,overlapCount:6,skippedCount:0,importKwh:1500,exportKwh:300,registerKwh:{importDay:1000,importNight:500,exportDay:200,exportNight:100},registerCoverage:{importDay:coverage,importNight:coverage,exportDay:coverage,exportNight:coverage}};
+    const obsolete:any={annualDayKwh:99999,annualNightKwh:0,annualInjectionDayKwh:0,annualInjectionNightKwh:0,period:coverage,importKwh:99999,exportKwh:0};
+    const props={...page.props,sharedPreview:preview,csvTotals:obsolete};let tree=contract.render(props);
+    assert.equal(nodes(tree).some(n=>n.type==='button'&&text(n)==='Vul dag/nachtwaarden in'),false);
+    button(tree,'Gebruik indicatieve jaarwaarden').props.onClick();
+    button(root.render(),'Overzicht').props.onClick();button(root.render(),'4. Contract').props.onClick();
+    const restored=getPage();assert.ok(restored.props.marketInput.annualDayKwh<1000);assert.equal(restored.props.usedIndication.gapCount,1496);
+    contract.dispose();contract=host(restored.type);tree=contract.render({...restored.props,sharedPreview:preview});
+    assert.match(text(tree),/Deze invoer is ingevuld met indicatieve jaarvolumes/);
+    assert.match(text(tree),/1496 gaten/);
+    tree=contract.render({...restored.props,sharedPreview:{status:'error',message:'synthetische fout'},csvTotals:obsolete});
+    assert.equal(nodes(tree).some(n=>n.type==='button'&&text(n)==='Vul dag/nachtwaarden in'),false);
+    tree=contract.render({...restored.props,sharedPreview:undefined,csvTotals:obsolete});
+    assert.equal(nodes(tree).some(n=>n.type==='button'&&text(n)==='Vul dag/nachtwaarden in'),false);
+  }finally{contract?.dispose();root.dispose();delete globals.window;}
+});
 const technical=([3,5,7,10,13] as const).map(capacityKwh=>({capacityKwh,powerKw:capacityKwh/2,shiftedKwh:100,chargedFromExportKwh:120,endingStoredKwh:2,lossesKwh:18,equivalentCycles:100/capacityKwh}));
 const assumptions={confirmed:true as const,contractName:"Synthetisch",contractType:"fixed" as const,effectiveStart:"2025-01-01",effectiveEnd:"2026-01-02",quoteSource:"Synthetisch",quoteDate:"2026-01-02",warrantyYears:10,pricesIncludeVat:true as const,importRateCtKwh:30,exportRateCtKwh:4,lifeYears:15,annualDegradationPercent:2,discountRatePercent:3,investmentsEur:{3:3000,5:5000,7:7000,10:10000,13:13000}};
 const compared=compareBatteryCandidates(quality,technical,assumptions);if(compared.status!=="financial")throw Error("fixture");
 const saved={version:3,savedAt:"2026-09-10T00:00:00Z",quality,technical,financial:{assumptions,results:compared.candidates,recommendedCapacityKwh:compared.recommendedCapacityKwh}};
 const storage=()=>{const data=new Map<string,string>([["crems.battery-analysis.v3",JSON.stringify(saved)]]);return{data,getItem:(k:string)=>data.get(k)??null,setItem:(k:string,v:string)=>void data.set(k,v),removeItem:(k:string)=>void data.delete(k)};};
 const csv="Van (datum);Van (tijdstip);Tot (datum);Tot (tijdstip);EAN-code;Meter;Metertype;Register;Volume;Eenheid;Validatiestatus;Omschrijving\n01-06-2026;00:00:00;01-06-2026;00:15:00;;;synthetisch;Injectie Dag;1,0;kWh;Uitgelezen;\n";
+test("Data-preview blijft na echte navigatie-effecten beschikbaar op Contract; nieuwe invoer wist de bron",async()=>{
+  const originalFetch=globalThis.fetch;
+  globals.window={localStorage:{getItem:()=>null}};
+  globalThis.fetch=async()=>new Response(JSON.stringify({result:null}),{status:200});
+  const root=host(app.App);
+  const render=()=>{let tree=root.render();root.flush();return root.render();};
+  try{
+    button(render(),'1. Data').props.onClick();
+    const input=find(render(),n=>n.type==='input'&&n.props.type==='file');
+    input.props.onChange({target:{files:[{size:csv.length,text:async()=>csv}],value:'synthetic.csv'}});
+    await waitFor(()=>text(render()).includes('CSV lokaal gecontroleerd'));
+    button(render(),'4. Contract').props.onClick();
+    const page=find(render(),n=>typeof n.type==='function'&&n.type.name==='ContractComparisonPage');
+    assert.equal(page.props.sharedPreview?.status,'success');
+    button(render(),'1. Data').props.onClick();
+    assert.match(text(render()),/CSV lokaal gecontroleerd/);
+    let finishRead:any;
+    find(render(),n=>n.type==='input'&&n.props.type==='file').props.onChange({target:{files:[{size:10,text:()=>new Promise(resolve=>{finishRead=resolve;})}],value:'replacement.csv'}});
+    button(render(),'4. Contract').props.onClick();
+    assert.equal(find(render(),n=>typeof n.type==='function'&&n.type.name==='ContractComparisonPage').props.sharedPreview,undefined);
+    finishRead(csv);await new Promise(resolve=>setTimeout(resolve,5));
+    assert.equal(find(render(),n=>typeof n.type==='function'&&n.type.name==='ContractComparisonPage').props.sharedPreview,undefined);
+  }finally{root.dispose();globalThis.fetch=originalFetch;delete globals.window;}
+});
 test("lokale catalogus laadt zonder persoonlijke invoer en rekent alleen de gecontroleerde afnamecomponent",async()=>{
   const originalFetch=globals.fetch,OriginalDate=globals.Date;
   let calls=0;
@@ -321,7 +371,7 @@ test("technisch bewaard rapport kan na bevestiging expliciet financieel worden a
   const privacy=find(tree,n=>n.type==="p"&&n.props?.className==="storage-privacy");
   assert.match(text(privacy),/contract- en offertegegevens/);assert.match(text(privacy),/Raspberry Pi/);
   assert.ok(nodes(tree).indexOf(privacy)<nodes(tree).indexOf(button(tree,"Bewaar volledig batterijrapport")));
-  button(tree,"Bewaar volledig batterijrapport").props.onClick();assert.deepEqual(savedFinancial,saved.financial);
+  button(tree,"Bewaar volledig batterijrapport").props.onClick();assert.deepEqual(savedFinancial,{...saved.financial,assumptions:{...assumptions,effectiveStart:brusselsContractDay("2025-01-01")!.start,effectiveEnd:brusselsContractDay("2026-01-02")!.end}});
   find(find(tree,n=>n.props?.["aria-label"]==="Financiële context"),n=>n.type==="input"&&n.props.type==="date").props.onChange({target:{value:"2025-02-01"}});tree=h.render(props);assert.equal(nodes(tree).filter(n=>n.type==="input"&&n.props.type==="checkbox").at(-1).props.checked,false);
   assert.equal(nodes(tree).some(n=>n.type==="button"&&text(n)==="Bewaar volledig batterijrapport"),false);h.dispose();
 });

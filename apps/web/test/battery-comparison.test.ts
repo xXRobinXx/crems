@@ -1,8 +1,16 @@
 import assert from "node:assert/strict";import test from "node:test";
 import { BATTERY_CAPACITIES, batteryEligibility, compareBatteryCandidates, createBatteryComparisonController, type FinancialAssumptions } from "../src/battery-comparison.ts";
+import {brusselsContractDay} from "../src/day-window.ts";
 const quality={period:{start:"2025-01-01T00:00:00Z",end:"2026-01-02T00:00:00Z"},integrityReliable:true,estimatedCount:0,gapCount:0,duplicateCount:0,overlapCount:0};
 const candidates=BATTERY_CAPACITIES.map(capacityKwh=>({capacityKwh,powerKw:capacityKwh/2,shiftedKwh:capacityKwh*100,chargedFromExportKwh:capacityKwh*110}));
 const assumptions:FinancialAssumptions={confirmed:true,contractName:"Testcontract",contractType:"fixed",effectiveStart:"2025-01-01",effectiveEnd:"2026-01-02",quoteSource:"Lokale offerte",quoteDate:"2026-01-02",warrantyYears:10,pricesIncludeVat:true,importRateCtKwh:30,exportRateCtKwh:4,lifeYears:15,annualDegradationPercent:2,discountRatePercent:3,investmentsEur:{3:4000,5:5000,7:6500,10:8500,13:11000}};
+
+test("financiële formulierdatums dekken een schoon Brussels jaar zonder een dag terug te zetten",()=>{
+  const year={...quality,period:{start:"2024-12-31T23:00:00Z",end:"2025-12-31T23:00:00Z"}};
+  const input={...assumptions,effectiveStart:brusselsContractDay("2025-01-01")!.start,effectiveEnd:brusselsContractDay("2025-12-31")!.end};
+  assert.equal(compareBatteryCandidates(year,candidates,input).status,"financial");
+  assert.equal(compareBatteryCandidates(year,candidates,{...input,effectiveEnd:brusselsContractDay("2025-12-30")!.end}).status,"technical");
+});
 test("blokkeert fysiek advies bij iedere kwaliteitsfout of te korte data",()=>{assert.deepEqual(batteryEligibility({...quality,period:{...quality.period,end:"2025-06-01T00:00:00Z"},integrityReliable:false,estimatedCount:1,gapCount:1,duplicateCount:1,overlapCount:1}),["UNRELIABLE_ORDER","ESTIMATED_DATA","DATA_GAPS","DUPLICATE_DATA","OVERLAPPING_DATA","LESS_THAN_12_MONTHS"]);assert.equal(compareBatteryCandidates({...quality,duplicateCount:1},candidates,assumptions).status,"ineligible");});
 test("blijft technisch totdat alle financiële aannames expliciet bevestigd zijn",()=>{assert.equal(compareBatteryCandidates(quality,candidates).status,"technical");assert.equal(compareBatteryCandidates(quality,candidates,{...assumptions,confirmed:false} as never).status,"technical");});
 test("blokkeert scalarberekening voor dynamische contracten en tarieven buiten de meetperiode",()=>{assert.equal(compareBatteryCandidates(quality,candidates,{...assumptions,contractType:"dynamic"}).status,"technical");assert.equal(compareBatteryCandidates(quality,candidates,{...assumptions,effectiveStart:"2025-01-02"}).status,"technical");assert.equal(compareBatteryCandidates(quality,candidates,{...assumptions,effectiveEnd:"2026-01-01"}).status,"technical");assert.equal(compareBatteryCandidates(quality,candidates,assumptions).status,"financial");});

@@ -73,6 +73,16 @@ const localMidnight = (date: CalendarDate): Date => {
 const dateLabel = (date: CalendarDate) =>
   nlDateFormatter.format(new Date(Date.UTC(date.year, date.month - 1, date.day)));
 
+/** Explicit instants for an inclusive Belgian calendar day; invalid dates stay invalid. */
+export const brusselsContractDay = (value: string): DayFetchWindow | undefined => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return;
+  const [year, month, day] = value.split("-").map(Number);
+  const date = { year: year!, month: month!, day: day! };
+  const check = new Date(`${value}T00:00:00.000Z`);
+  if (!Number.isFinite(check.getTime()) || check.toISOString().slice(0, 10) !== value) return;
+  return { start: localMidnight(date).toISOString(), end: localMidnight(addCalendarDays(date, 1)).toISOString() };
+};
+
 /** A calendar-day frame for charts. It never changes what the data loaders may fetch. */
 export const fullBrusselsDayWindow = (selection: DaySelection, now: Date): DayDisplayWindow => {
   if (!Number.isFinite(now.getTime())) throw new Error("INVALID_NOW");

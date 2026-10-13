@@ -1,12 +1,23 @@
 import assert from "node:assert/strict";import test from "node:test";
 import {BATTERY_ANALYSIS_KEY,BATTERY_REPORT_KEY,convertLegacyReport,getBrowserStorage,loadBatteryStorageState,removeBatteryStorage,saveBatteryReport,type LocalBatteryReport} from "../src/local-battery-analysis.ts";
 import {compareBatteryCandidates} from "../src/battery-comparison.ts";
+import {brusselsContractDay} from "../src/day-window.ts";
 const assumptions={confirmed:true as const,contractName:"Contract",contractType:"fixed" as const,effectiveStart:"2025-01-01",effectiveEnd:"2026-01-02",quoteSource:"Offerte",quoteDate:"2026-01-02",warrantyYears:10,pricesIncludeVat:true as const,importRateCtKwh:30,exportRateCtKwh:4,lifeYears:15,annualDegradationPercent:2,discountRatePercent:3,investmentsEur:{3:3000,5:5000,7:7000,10:10000,13:13000}};
 const technical=([3,5,7,10,13] as const).map(capacityKwh=>({capacityKwh,powerKw:capacityKwh/2,shiftedKwh:100,chargedFromExportKwh:120,endingStoredKwh:2,lossesKwh:18,equivalentCycles:20}));
 const quality={period:{start:"2025-01-01T00:00:00Z",end:"2026-01-02T00:00:00Z"},integrityReliable:true,estimatedCount:0,gapCount:0,duplicateCount:0,overlapCount:0};
 const computed=compareBatteryCandidates(quality,technical,assumptions);if(computed.status!=="financial")throw Error("invalid fixture");const results=computed.candidates;
 const report:LocalBatteryReport={version:3,savedAt:"2026-09-07T10:00:00Z",quality,technical,financial:{assumptions,results,recommendedCapacityKwh:computed.recommendedCapacityKwh}};
 const memory=()=>{const data=new Map<string,string>();return{data,getItem:(k:string)=>data.get(k)??null,setItem:(k:string,v:string)=>void data.set(k,v),removeItem:(k:string)=>void data.delete(k)}};
+
+test("Belgische contractgrenzen blijven geldig bij financieel bewaren en herladen",()=>{
+  const q={...quality,period:{start:"2024-12-31T23:00:00Z",end:"2025-12-31T23:00:00Z"}};
+  const a={...assumptions,effectiveStart:brusselsContractDay("2025-01-01")!.start,effectiveEnd:brusselsContractDay("2025-12-31")!.end};
+  const outcome=compareBatteryCandidates(q,technical,a);assert.equal(outcome.status,"financial");if(outcome.status!=="financial")return;
+  const candidate={...report,quality:q,financial:{assumptions:a,results:outcome.candidates,recommendedCapacityKwh:outcome.recommendedCapacityKwh}};
+  const store=memory();assert.equal(saveBatteryReport(store,candidate),true);
+  const loaded=loadBatteryStorageState(store);assert.equal(loaded.status,"current");
+  if(loaded.status==="current")assert.deepEqual(loaded.report,candidate);
+});
 test("schrijft expliciet exact één allowlisted v3 en laadt structureel identiek",()=>{const s=memory();let writes=0;const storage={...s,setItem:(k:string,v:string)=>{writes++;s.setItem(k,v);}};assert.equal(saveBatteryReport(storage,report),true);assert.equal(writes,1);assert.deepEqual(loadBatteryStorageState(s),{status:"current",report});assert.doesNotMatch(s.data.get(BATTERY_REPORT_KEY)!,/csv|chunks|intervals|EAN|meter|file|token/i);});
 test("weigert extra velden en houdt opslagfout veilig",()=>{assert.equal(saveBatteryReport({setItem(){throw Error("blocked");}},report),false);assert.equal(saveBatteryReport({setItem(){throw Error("must not write");}},{...report,token:"x"} as never),false);});
 test("laadt veilige v2 als legacy zonder write of delete en converteert alleen expliciet",()=>{const s=memory();s.data.set(BATTERY_ANALYSIS_KEY,JSON.stringify({version:2,savedAt:"2026-01-01Z",period:report.quality.period,...report.quality,comparisons:technical}));const before=new Map(s.data);const state=loadBatteryStorageState(s);assert.equal(state.status,"legacy");assert.deepEqual(s.data,before);if(state.status==="legacy")assert.equal(saveBatteryReport(s,convertLegacyReport(state.report,"2026-09-07T10:00:00Z")),true);assert.ok(s.data.has(BATTERY_ANALYSIS_KEY));assert.ok(s.data.has(BATTERY_REPORT_KEY));});

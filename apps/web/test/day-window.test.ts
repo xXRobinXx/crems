@@ -1,7 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { fullBrusselsDayWindow, selectBrusselsDayWindow } from "../src/day-window.ts";
+import { brusselsContractDay, fullBrusselsDayWindow, selectBrusselsDayWindow } from "../src/day-window.ts";
+
+test("contractdagen gebruiken Belgische middernacht en de inclusieve eindrand, ook bij DST", () => {
+  assert.deepEqual(brusselsContractDay("2025-01-01"), {start:"2024-12-31T23:00:00.000Z",end:"2025-01-01T23:00:00.000Z"});
+  assert.deepEqual(brusselsContractDay("2025-07-01"), {start:"2025-06-30T22:00:00.000Z",end:"2025-07-01T22:00:00.000Z"});
+  for (const [day, hours] of [["2025-03-30",23],["2025-10-26",25]] as const) {
+    const window=brusselsContractDay(day)!;
+    assert.equal(Date.parse(window.end)-Date.parse(window.start),hours*3600000);
+  }
+  for(const invalid of ["2025-02-29","2025-02-31","2025-13-01","2025-1-01","","2025-01-01T00:00:00Z"]) assert.equal(brusselsContractDay(invalid),undefined);
+  assert.ok(brusselsContractDay("2024-02-29"));
+});
 
 test("maakt op een normale dag een lokaal kalenderdagvenster van 24 uur", () => {
   const result = selectBrusselsDayWindow("yesterday", new Date("2026-02-12T12:00:00Z"));

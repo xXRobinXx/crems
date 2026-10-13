@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { contractCsvTotals,applyContractCsvTotals } from "../src/contract-csv.ts";
+import { contractCsvTotals,applyContractCsvTotals,contractCsvIndication } from "../src/contract-csv.ts";
 import type { CsvPreview } from "../src/csv-preview.ts";
 import type { ContractMarketInput } from "../src/contract-market.ts";
 
@@ -31,4 +31,20 @@ test("CSV-overname verwijdert optelruis, behoudt zes decimalen en muteert geen b
   const result=applyContractCsvTotals(input,totals);
   assert.deepEqual(result,{...input,annualDayKwh:3504,annualNightKwh:7008,annualInjectionDayKwh:350.4,annualInjectionNightKwh:0.123456});
   assert.equal(totals.annualDayKwh,3503.9999999979086);assert.equal(input.annualDayKwh,0);
+});
+
+test("onvolledige langere export levert uitsluitend een expliciet indicatief scenario met bronkwaliteit",()=>{
+  const p=preview({period:{start:"2025-01-01T00:00:00Z",end:"2026-06-07T00:00:00Z"},estimatedCount:102,gapCount:1496,duplicateCount:6,overlapCount:6});
+  const indication=contractCsvIndication(p)!;
+  assert.equal(contractCsvTotals(p),undefined);
+  assert.equal(indication.days,522);
+  assert.equal(indication.totals.annualDayKwh,1000*365.2425/522);
+  assert.equal(indication.gapCount,1496);assert.equal(indication.duplicateCount,6);
+  assert.equal(indication.estimatedCount,102);assert.equal(indication.overlapCount,6);
+  assert.equal(p.status==="success"&&p.registerKwh.importDay,1000);
+});
+
+test("geen indicatie bij kort of onbetrouwbaar bestand, ontbrekend register of ongeldig volume",()=>{
+  assert.equal(contractCsvIndication(preview()),undefined);
+  for(const changes of [{period:{start:"2025-01-01T00:00:00Z",end:"2025-02-01T00:00:00Z"}},{integrityReliable:false},{registerCoverage:{importDay:coverage,importNight:null,exportDay:coverage,exportNight:coverage}},{registerKwh:{importDay:NaN,importNight:1,exportDay:1,exportNight:1}},{gapCount:-1}]) assert.equal(contractCsvIndication(preview({estimatedCount:1,...changes})),undefined);
 });
