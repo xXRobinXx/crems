@@ -1,5 +1,16 @@
 # CREMS Product Audit
 
+## Actuele baseline en resterende lijst — 13 oktober 2026
+
+**Pi 0.1.17 draait**, source/tag/publicatie en backup geverifieerd; [actueel deploymentbewijs](docs/reviews/task-061-deployment017-2026-10-13.md). Goedkoop-naar-duur afgerond met 362 tests, onafhankelijke APPROVED, lokale en geïnstalleerde browser-PASS. Profiel/batterijrapport na appupdate behouden. Live 120 s: 107 gemeten events, nul ongeldige/verouderde events. Synthetische opslagbackup/restore PASS. Oude versie-/kandidaatteksten hieronder zijn gedateerde stappen, geen actuele baseline.
+
+Task 061 blijft de enige actieve taak. Root enige productiewriter; huidige sorteerwijziging voltooid, geen verdere productiecode in deze vervolgstap. Documentatie-write set aangevuld met PRODUCT_AUDIT.md en actueel deploymentrapport. Nog open, met concrete grenzen:
+
+- Initieel verbinden/reconnect onderscheiden van de melding Bridge offline; actuele browser start offline en wordt live. Geen vastgestelde serveruitval tijdens de twee-minutenmeting.
+- Fysiek LAN bewijzen: pc 192.168.0.x en Pi 192.168.88.x, directe Pi-HTTP timeout. Tailscale-PASS sluit deze gate niet.
+- Echte Supervisor-backuprestore/rollback en hostherstart/resultaatbehoud nog niet uitgevoerd. Updatebackup en synthetisch bestandherstel zijn bevestigd, geen productie-restoreclaim.
+- Langdurige Pi/hardwarestabiliteit blijft open; de actuele 120 s-meting heeft beperkte duur.
+
 ## Actuele baseline — documentatiecleanup 2 oktober 2026
 
 Laatste vastgelegde Pi-versie is **0.1.14**, installed/started met updatebackup en HTTP-runtimecontrole; zie [deploymentbewijs](docs/task-061-deployment014.md). De lokale **0.1.15-kandidaat** herstelt de contract-CSV-bestandskiezer; zie [begrensde review](docs/task-061-csv015-review.md). Deze documentatiecleanup voerde geen nieuwe externe controle uit. Volledige actuele Pi-browser-, fysieke LAN-, herstart-/resultaatbehoud- en rollbackgates blijven open; historische 0.1.13-/NOT RUN-/approvalteksten hieronder zijn gedateerde evidence. De volledige actuele openlijst staat bovenaan TASKS.md. Geen nieuwe releaseapproval of attestatie.
