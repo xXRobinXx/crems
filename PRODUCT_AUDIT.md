@@ -1,3 +1,7 @@
+## Actuele verbindingsrelease — 14 oktober 2026
+
+**Pi 0.1.18 draait**, met backup en actuele gebruikersbrowser-PASS: nieuwe assets geladen, Home Assistant live zichtbaar na refresh en Batterij→Contract; profiel en batterijrapport behouden. [Deploymentbewijs](docs/reviews/task-061-deployment018-2026-10-14.md). Verbindingsherstel afgerond met368tests, onafhankelijkeAPPROVED en synthetische fallback/uitval/herstel-browserPASS. Initieel verbinden en herstel zijn onderscheiden; oude waarden verliezen Live-label. De oorspronkelijke intermitterende SSEoorzaak blijft onzeker; geen garantie tegen netwerkuitval. Open operationele controles blijven fysiekeLAN, echteSupervisorrestore/rollback, hostherstartbehoud en langdurigehardwarestabiliteit. Hieronder staan gedateerde eerdere stappen. Root enige productiewriter; dit vervolg verandert alleen bewijs en documentatie, write set aangevuld met PRODUCT_AUDIT.md.
+
 # CREMS Product Audit
 
 ## Actuele baseline en resterende lijst — 13 oktober 2026
