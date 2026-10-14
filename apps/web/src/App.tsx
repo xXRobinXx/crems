@@ -80,7 +80,7 @@ export function App() {
   }, { createAnalyzer: createFluviusPreviewAnalyzer, map: mapCsvPreview, yieldControl:()=>new Promise(resolve=>setTimeout(resolve,0)) }), []);
   useEffect(() => () => csvSelection.dispose(), [csvSelection]);
   useEffect(() => { if (page !== "import" && csvProgress?.phase !== "complete") csvSelection.dispose(); }, [page, csvSelection, csvProgress?.phase]);
-  const { reading, connected } = useLiveMeter();
+  const { reading, connected, connection } = useLiveMeter();
   const history = usePowerHistory(connected && reading.source === "home-assistant", historyDay);
   const priceEnabled = true;
   const yesterdayPriceHistory = usePriceHistory(priceEnabled && historyDay === "yesterday", "yesterday");
@@ -147,7 +147,7 @@ export function App() {
         <span className="nav-step"><button className={page === "contract" ? "active" : ""} aria-current={page === "contract" ? "page" : undefined} onClick={() => setPage("contract")}>4. Contract</button></span>
       </nav>
       <div className={`status ${connected && reading.source !== "simulator" && reading.quality === "measured" ? "online" : ""}`}><i />{
-        !connected ? "Bridge offline" : reading.source === "simulator" ? "Simulatie · geen echte data" : reading.quality === "incomplete" ? "Home Assistant · onvolledige meting" : "Home Assistant live"
+        !connected ? connection === "connecting" ? "Verbinden met Home Assistant…" : connection === "reconnecting" ? "Verbinding wordt hersteld…" : "Geen recente meting · opnieuw verbinden…" : reading.source === "simulator" ? "Simulatie · geen echte data" : reading.quality === "incomplete" ? "Home Assistant · onvolledige meting" : "Home Assistant live"
       }</div>
     </header>
 
@@ -156,8 +156,8 @@ export function App() {
     {page === "overview" && <>
       <section className="hero"><div><p className="eyebrow">Slim energiebeheer</p><h1>Alles wat je woning<br />met energie doet.</h1></div><div className="now"><span>Spotprijs nu</span><strong>{currentPriceCents?.toLocaleString("nl-BE", { maximumFractionDigits: 1 }) ?? "—"}</strong><small>{currentPriceCents == null ? "geen gepubliceerde spotprijs" : "spotprijs in ct/kWh · Energy-Charts.info"}</small></div></section>
       <section className="metrics">
-        <article><span>{reading.source === "simulator" ? "Demo verbruik" : reading.quality === "incomplete" ? "Onvolledige afname" : "Live verbruik"}</span><strong>{reading.quality === "incomplete" && reading.importPowerW === 0 ? "—" : `${reading.importPowerW.toLocaleString("nl-BE")} W`}</strong><small>{reading.source === "simulator" ? "gesimuleerde testwaarde" : reading.quality === "incomplete" ? "sensor ontbreekt of is ongeldig" : `bijgewerkt om ${updated}`}</small></article>
-        <article><span>{reading.source === "simulator" ? "Demo injectie" : reading.quality === "incomplete" ? "Onvolledige injectie" : "Live injectie"}</span><strong className="green">{reading.quality === "incomplete" && reading.exportPowerW === 0 ? "—" : `${reading.exportPowerW.toLocaleString("nl-BE")} W`}</strong><small>{reading.quality === "incomplete" ? "sensor ontbreekt of is ongeldig" : "naar het net"}</small></article>
+        <article><span>{reading.source === "simulator" ? "Demo verbruik" : !connected ? "Laatste afname" : reading.quality === "incomplete" ? "Onvolledige afname" : "Live verbruik"}</span><strong>{reading.quality === "incomplete" && reading.importPowerW === 0 ? "—" : `${reading.importPowerW.toLocaleString("nl-BE")} W`}</strong><small>{reading.source === "simulator" ? "gesimuleerde testwaarde" : !connected ? `laatste meting om ${updated} · opnieuw verbinden` : reading.quality === "incomplete" ? "sensor ontbreekt of is ongeldig" : `bijgewerkt om ${updated}`}</small></article>
+        <article><span>{reading.source === "simulator" ? "Demo injectie" : !connected ? "Laatste injectie" : reading.quality === "incomplete" ? "Onvolledige injectie" : "Live injectie"}</span><strong className="green">{reading.quality === "incomplete" && reading.exportPowerW === 0 ? "—" : `${reading.exportPowerW.toLocaleString("nl-BE")} W`}</strong><small>{reading.quality === "incomplete" ? "sensor ontbreekt of is ongeldig" : "naar het net"}</small></article>
         <article><span>Lokale energieanalyse</span><strong>{energyProfile||batteryAnalysis ? "Lokaal klaar" : "Nog niet bewaard"}</strong><small>{energyProfile ? `profiel tot ${new Date(energyProfile.period.end).toLocaleDateString("nl-BE")}` : batteryAnalysis ? `batterijresultaat tot ${new Date(batteryAnalysis.quality.period.end).toLocaleDateString("nl-BE")}` : "controleer eerst je CSV"}</small></article>
         <article><span>Spotprijs volgend uur</span><strong>{nextPriceCents == null ? "—" : `${nextPriceCents.toLocaleString("nl-BE", { maximumFractionDigits: 1 })} ct`}</strong><small>{nextPriceCents == null ? "geen gepubliceerde spotprijs" : "spotprijs via Energy-Charts.info"}</small></article>
       </section>

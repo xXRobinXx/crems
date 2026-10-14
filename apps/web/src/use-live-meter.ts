@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { LiveMeterReading } from "@crems/core";
+import { startMeterConnection, type MeterConnection } from "./live-meter-connection.ts";
 
 const fallback: LiveMeterReading = {
   timestamp: new Date().toISOString(),
@@ -27,19 +28,12 @@ export const parseLiveMeterEvent = (data: string): LiveMeterReading | undefined 
 
 export const useLiveMeter = () => {
   const [reading, setReading] = useState(fallback);
-  const [connected, setConnected] = useState(false);
+  const [connection, setConnection] = useState<MeterConnection>("connecting");
 
   useEffect(() => {
-    const events = new EventSource("api/stream");
-    events.onmessage = (event) => {
-      const parsed = parseLiveMeterEvent(event.data);
-      if (!parsed) return;
-      setReading(parsed);
-      setConnected(true);
-    };
-    events.onerror = () => setConnected(false);
-    return () => events.close();
+    return startMeterConnection({ stream: () => new EventSource("api/stream"), fetch: (url, options) => fetch(url, options),
+      parse: parseLiveMeterEvent, reading: setReading, connection: setConnection });
   }, []);
 
-  return { reading, connected };
+  return { reading, connected: connection === "live", connection };
 };
