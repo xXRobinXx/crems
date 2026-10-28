@@ -1117,4 +1117,3 @@ Actuele `pnpm harness gate`: **NOT APPROVED**. Voor deze fingerprint ontbreekt e
 # Actuele beperkte 0.1.19-review — 28 oktober 2026
 
 [Release019-review](docs/reviews/task-061-release019-review-2026-10-28.md): APPROVED door root in sequentiële Agent A-rol voor uitsluitend de expliciet geautoriseerde beperkte update; geen onafhankelijke volledige audit. Actuele volledige harness PASS, producttests369/369/tooling16/16; kandidaatbrowsermatrix zeven scenario's PASS. Gebruiker geeft expliciet uitzondering voor24uursmeting en geïsoleerde restoreproef, die open blijven. Protected backup3cd147ed bevestigd. Installatie/runtimebewijs volgt afzonderlijk; geen nageclaimde Pi-upgrade op dit reviewmoment.
-
