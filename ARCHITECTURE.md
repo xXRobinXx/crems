@@ -121,4 +121,4 @@ Op expliciete gebruikersopdracht wordt het bestaande rapport aangevuld met optio
 - De workspace is een Git-repository; releasecontrole gebruikt diffs, onveranderlijke tags en ARM64-images. Runtime-, reboot- en rollbackbewijs blijft afzonderlijk vereist.
 - Home Assistant-deployment gebruikt geauthenticeerde Ingress, relatieve frontendroutes en server-side uitsluitend peer `172.30.32.2`. LAN-toegang loopt via Home Assistant op poort 8123; de bridgepoort 8099 wordt niet rechtstreeks gepubliceerd. Zie het goedgekeurde deploymentontwerp in `docs/task-037-haos-app.md`.
 
-Zie ook `docs/architecture.md` voor de oorspronkelijke verticale-slice-notities.
+Zie ook `docs/history/architecture-original.md` voor de oorspronkelijke verticale-slice-notities.

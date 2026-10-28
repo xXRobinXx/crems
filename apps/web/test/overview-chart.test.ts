@@ -8,7 +8,7 @@ import {fullBrusselsDayWindow} from "../src/day-window.ts";
 const source = await readFile(new URL("../src/App.tsx", import.meta.url), "utf8");
 const bundled = await build({entryPoints:[fileURLToPath(new URL("../src/App.tsx",import.meta.url))],bundle:true,write:false,format:"esm",platform:"node",logLevel:"silent",plugins:[{name:"overview-runtime",setup(b){
   b.onResolve({filter:/^react(?:\/jsx-runtime)?$/},args=>({path:args.path,namespace:"runtime"}));
-  b.onLoad({filter:/.*/,namespace:"runtime"},args=>({contents:args.path==="react"?'export const useState=()=>{}; export const useRef=()=>{}; export const useMemo=()=>{}; export const useEffect=()=>{};':'export const Fragment="fragment"; export const jsx=(type,props,key)=>({type,props,key}); export const jsxs=jsx;'}));
+  b.onLoad({filter:/.*/,namespace:"runtime"},args=>({contents:args.path==="react"?'export const useState=initial=>[typeof initial==="function"?initial():initial,()=>{}]; export const useRef=initial=>({current:initial}); export const useMemo=()=>{}; export const useEffect=()=>{};':'export const Fragment="fragment"; export const jsx=(type,props,key)=>({type,props,key}); export const jsxs=jsx;'}));
   b.onLoad({filter:/App\.tsx$/},()=>({contents:source.replaceAll('new Date()', 'new Date("2026-09-22T12:00:00.000Z")')+'\nexport {PowerHistoryPanel};',loader:"tsx"}));
   b.onLoad({filter:/price-chart\.ts$/},async args=>({contents:(await readFile(args.path,"utf8")).replaceAll('Date.now()', 'Date.parse("2026-09-22T12:00:00.000Z")'),loader:"ts"}));
 }}]});

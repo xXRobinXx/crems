@@ -5,18 +5,18 @@ description: Route CREMS repository maintenance, implementation, review and Home
 
 # CREMS workflow router
 
-Find the current bounded step in TASKS.md and read AGENTS.md plus applicable requirements/ADR decisions before changing files. The current task has one production writer and a recorded write set; preserve existing working-tree changes.
+Use `node tools/task-context.mjs` for the current bounded step and ownership from TASKS.md; if selection fails, inspect the top directly. Search older sections only when needed. Apply AGENTS.md and relevant requirements/ADR decisions, reusing unchanged instructions already read in this chat. The current task has one production writer and a recorded write set; preserve existing working-tree changes.
 
 Use the [repository map](../../../docs/guides/repository-map.md) for code entrypoints and folder boundaries. Load the role relevant to the work: [reviewer](../../../AGENT_A_ARCHITECT_REVIEWER.md), [implementer](../../../AGENT_B_IMPLEMENTER.md), or [QA](../../../AGENT_C_UX_BROWSER_QA.md). A role is a responsibility, not an automatic subagent or model switch. Delegation follows the user's authorization and project rules.
 
 ## Select a route
 
-- UI/navigation/CSV/report: inspect App.tsx and the specific client/controller/serializer plus its web tests; consult core only when calculation semantics change.
+- UI/navigation/CSV/report: start with the specific client/controller/serializer and its web tests. Search App.tsx for affected wiring and read that section; inspect core when calculation semantics or shared dependencies are involved.
 - Energy/CSV/battery/tariff calculation: inspect the relevant packages/core module, its pure tests and the governing ADR.
 - Meter/price/history: inspect bridge route/service/source and matching web response parser; measured, estimated and incomplete stay distinct.
 - Storage/refresh/delete: read the [storage plan](../../../docs/central-storage-plan.md), relevant local/central validators and mutation/component tests. Use synthetic data; do not read personal runtime storage for general orientation.
 - Pi/release/Ingress: read the [release procedure](../../../docs/release-home-assistant.md) and manifests/launcher/Dockerfile/workflow. Localhost is the browser device. Ingress requires relative routes, exact server-side peer 172.30.32.2 and no wildcard storage CORS.
-- Structure/skills/tooling: use `pnpm check:structure`, `pnpm test:harness`, the repository map and [router research](../../../docs/research/skill-routing-research.md). Native local skill selection needs no hosted router.
+- Structure/skills/tooling: use `pnpm check:structure`, `pnpm test:harness` and the repository map. Read [router research](../../../docs/research/skill-routing-research.md) only for router selection/evaluation. Native local skill selection needs no hosted router.
 
 ## Verify the current step
 
@@ -26,4 +26,4 @@ Browser QA requires a new explicit user instruction under this repository's rule
 
 For an artifact request, use the matching available document/spreadsheet/presentation/image skill only if the output actually needs it. For Codex/OpenAI configuration consult official documentation. Do not install external routers, send prompts to a provider or edit global configuration merely to route this task.
 
-Report what changed, actual verification and remaining gates. Keep the active task's open Pi/LAN/persistence/rollback/provider gates visible until corresponding current evidence exists.
+Report what changed, actual verification and remaining gates. Handoffs retain owner/write set, next step, latest test status and evidence links. Keep the active task's open Pi/LAN/persistence/rollback/provider gates visible until corresponding current evidence exists.

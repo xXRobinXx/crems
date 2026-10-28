@@ -41,7 +41,7 @@ Begin bij `AGENTS.md`, requirements/ADR's en de actuele scope in `TASKS.md`. De 
 
 | Vraag | Code / documentatie |
 |---|---|
-| Navigatie/CSV/batterijscherm | `apps/web/src/App.tsx`, controller/client, bijbehorende webtest |
+| Navigatie/CSV/batterijscherm | specifieke controller/client en webtest; zoek daarna betrokken wiring in `apps/web/src/App.tsx` |
 | Berekeningscorrectheid/DST/CSV | `packages/core/src`, pure tests, relevante ADR |
 | Meter/prijzen/history | bridge route/service/source plus webparser/controller |
 | Opslag/refresh/delete/migratie | centrale validator/route, lokale serializers/client, componenttests; [opslagontwerp](../central-storage-plan.md) |

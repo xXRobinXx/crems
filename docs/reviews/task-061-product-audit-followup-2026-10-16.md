@@ -1,0 +1,35 @@
+# Task061 — productaudit vervolg — 16 oktober 2026
+
+Root heeft de eerdere onderbroken audit hervat als requirementsgerichte code-/bewijscontrole. Geen productiecode gewijzigd, geen nieuwe dependencies, geen browserbediening in deze vervolgstap. De onafhankelijke code/UI-eindreview van16oktober blijft [begrensd tot haar vastgelegde scope](task-061-final-review-2026-10-16.md). Dit rapport is geen onafhankelijke regel-voor-regel audit van iedere bronregel, penetratietest of algemene releasegoedkeuring.
+
+## Dekking en resultaat
+
+| Eis/keten | Geïnspecteerde ingang en bestaand actueel bewijs | Oordeel |
+|---|---|---|
+| FR001/002 livebron/read-only | source-factory, meter-source, server, live-meter-connection, use-live-meter; adaptertests en echte productiepolltest. HA-transport uitsluitend GET; simulator estimated; ontbrekend vermogenskanaal incomplete; één poll tegelijk | Geen nieuwe P1/P2 binnen gecontroleerde keten |
+| FR003/003a CSV/privacy | csv-selection, fluvius-stream-preview, fluvius-quarter-hour; streamingtest100krijen, record64KiBlimiet,20MiBselectie, vier registerstates, begrensde foutvoorbeelden, annulering/sequence; identifiers worden niet in veilige intervallen opgenomen | Automatische en eerdere synthetische browserdekking aanwezig |
+| FR004/005 contracten | profile-contract-comparison, contract-market, LocalContractCatalog, core/local-contract-catalog, bridge contractroutes; geldige periode, regio, ontbrekende tarieven, vaste/variabele scenario's, sortering vóór paginering. Alleen expliciete compare verstuurt de afgebakende invoer | Lokale vergelijking bewezen; externe providerrechten blijven aparte blokkade |
+| FR006/010/011 batterij | battery-simulation, battery-comparison, battery-report-controller, financiële App-wiring en centrale validatie. Geen financiële uitkomst bij geschat/gap/overlap/onbetrouwbaar/<365dagen; bevestiging vervalt bij invoerwijziging; volledige contractdekking; eindlading niet als besparing; geladen energie kost injectievergoeding; centrale herberekening controleert cashflows/NPV | Eerdere P1-financiële allowlist-/periodebevinding hersteld in huidige code en regressies |
+| FR007 zelfstandige app | main/App, relatieve buildassets, Dockerfile/launcher; Reactfrontend zonder HA-frontendimport, eigen bridge | Lokale kandidaatbuild bewezen; nieuwe ARM64-image niet gebouwd/uitgerold |
+| FR008 historie | power-history-route/service/normalisatie, actuele controller/hooks/view; tijdvenster maximaal25u, toekomst geweigerd, geen simulatorhistory;10sdeadline, drie retries, stale callbacks/cleanup/dagwissel | Actuele lokale browsermatrix en53gerichte tests, onderdeel van383tests |
+| FR009 spotprijzen | direct-spot-price, price-history-route, price-chart; BE/EuropeBrussels/schema/unit/licentievalidatie,EUR/MWh÷10,10mincache, drie dagen, nul/negatief geldig, niet-gepubliceerd leeg. Nieuwe hook/view bewaakt kalenderdag | Actuele regressies inclDST en lokale kalenderbrowsercontrole |
+| FR012 opslag/herstel | central-storage/route/client, local-energy-profile, local-battery-analysis, App-revisies; atomair schrijven, strikteallowlists, corruptebytes blijven staan, mutatiewachtrij, oude callbacks overschrijven nieuwe actie niet, lege centrale store wist browserkopie niet | Eerdere P1-corruptie-/allowlistbevindingen hersteld; lokale echte bridge/opslagbrowsermatrix PASS |
+| FR013 dagrapport | battery-simulation-observer, battery-daily-report, BatteryDailyReport, centrale dagelijkse validatie; lading over middernacht, verlies bij gaps, maximaal4000dagaggregaten,92/100DSTkwartieren, detail alleen tijdelijk uit bronbestand | Tests en eerdere actuele synthetische browsermatrix; geen kwartieropslagclaim |
+| Ingress/security | server-peercheck vóór routes/assets, ingress.ts exact172.30.32.2, DockerENV verplicht, geen gepubliceerde8099, relatieve routes, geen wildcardCORS, manifests/ARM64workflow, production-start.test.ts | Huidige bron en echte lokale HTTP-regressies; geïnstalleerde0.1.18IngressHTTP eerder gecontroleerd |
+| Secrets/buildgrens | .dockerignore, expliciete DockerCOPY, launcherconfig, webbuild zonder sourcemaps; aanvullend script vergelijkt bekende geconfigureerde geheimen alleen in geheugen met gebouwde assets | PASS: geen bekende secrets in bundle, geen sourcemaps, geen echte.env onder Git; geen volledige geheimendetectorclaim |
+
+Bewijsbasis: `.harness/task-061-final-check-2026-10-16.log`383tests/core71/web185/bridge111/harness16, structuur/build/typecheck PASS; `.harness/task061-audit-safety-checks.json` PASS; [finale lokale browsermatrix](task-061-final-local-qa-2026-10-16.md). Bronassets ongewijzigd: app-233a83289c4346f8.js en app-63f7e5165a14c645.css.
+
+## Resterende concrete bevindingen
+
+- P2 operationeel: fysieke route naar Pi-subnet ontbreekt vanaf huidige pc. [Gerichte LAN-diagnose](task-061-lan-check-2026-10-16.md). Gebruiker kan nu niet op Pi-LAN aansluiten; gate expliciet geblokkeerd.
+- P2 bewijs/omgeving: geen geïsoleerde HAOS-testhost aangewezen. Dockerclient aanwezig maar Linux-engine niet actief; alleen docker-desktopWSLdistributie zichtbaar. Docker alleen vervangt geen complete HAOS-/Supervisorrestoreomgeving. Geen productie-restore als proef.
+- P2 releasebewijs: langdurige24uurswaarneming en actuele geïnstalleerde kandidaatbrowsercontrole ontbreken. Korte metingen sluiten die grenzen niet.
+- P2 externe afhankelijkheid: partnerrechten/voorwaarden en echte providerconfiguratie niet bewezen. Geen registratie, voorwaardenacceptatie of persoonlijke compare uitgevoerd om dit te omzeilen.
+- P3 documentatie: REQUIREMENTS-productstatus en repositorykaart bevatten gedateerde0.1.14/0.1.15beschrijvingen, terwijl de actuele geïnstalleerde baseline0.1.18is. Functionele eisen/ADR's niet stilzwijgend aangepast; actuele baseline en grenzen staan bovenaan PRODUCT_AUDIT/TASKS. Dit is een historische statusdiscrepantie, geen vastgesteld runtimegebrek.
+
+Er is in deze gecontroleerde ketens geen nieuwe reproduceerbare P1/P2-codefout vastgesteld. Volledige release blijft open vanwege expliciet genoemde operationele/externe bewijsgrenzen. De oorspronkelijke onderbroken onafhankelijke audit wordt niet achteraf als voltooid gepresenteerd; deze root-vervolgcontrole heeft haar eigen bovenstaande dekking.
+
+## Aanvullende reviewbevinding in tijdelijke meethelper
+
+De onafhankelijke reviewer vond tijdens de operationele proef een P2 in de genegeerde `.harness/task061-stability-monitor.mjs`: een gelijktijdige heartbeat kon de COMPLETE-status overschrijven met RUNNING. Eerste log bewaart COMPLETE15:11:53.684UTC gevolgd door RUNNING15:11:53.686UTC; die JSON geldt niet als geldige terminale PASS. Hersteld door statuswrites te serialiseren, finished te bewaken en de heartbeat vóór de finale write te stoppen. Eerste bestanden bewaard als `task061-post-reboot-stability-first.*`; herhaalde echte120sproef en uiteindelijke review staan in het operationele afsluitrapport. Dit raakt het lokale meetscript, niet CREMS-productiecode. Er is geen24uurs-PASS uit de eerste proef afgeleid.

@@ -3,10 +3,11 @@ import type { DaySelection } from "./day-window";
 import { createPowerHistoryController } from "./power-history-controller";
 import type { PowerHistoryState } from "./power-history";
 import { loadPowerHistory } from "./power-history";
-import { selectBrusselsDayWindow } from "./day-window";
+import { fullBrusselsDayWindow, selectBrusselsDayWindow } from "./day-window";
 
 export const usePowerHistory = (enabled: boolean, selection: DaySelection) => {
   const [state, setState] = useState<PowerHistoryState>({ status: "unavailable" });
+  const calendarDay = fullBrusselsDayWindow(selection, new Date()).start;
   const controller = useMemo(() => createPowerHistoryController(setState, {
     now: () => new Date(), request: fetch,
     setInterval: (callback, milliseconds) => window.setInterval(callback, milliseconds),
@@ -16,9 +17,9 @@ export const usePowerHistory = (enabled: boolean, selection: DaySelection) => {
   }), []);
 
   useEffect(() => {
-    controller.update(enabled, selection);
-  }, [controller, enabled, selection]);
+    controller.update(enabled, selection, true);
+  }, [controller, enabled, selection, calendarDay]);
   useEffect(() => () => controller.dispose(), [controller]);
 
-  return state;
+  return { ...state, retry: () => controller.update(enabled, selection, true) };
 };

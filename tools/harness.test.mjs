@@ -1,13 +1,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseTasks, releaseGate, checks, fingerprint, fingerprintRootFiles } from './harness.mjs';
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, rm, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 
 const evidence = { fingerprint: 'v1', stable: true, checks: checks.map(name => ({ name, exitCode: 0 })) };
 const review = { fingerprint: 'v1', status: 'APPROVED', role: 'Agent A', report: 'docs/review.md' };
 const browser = { fingerprint: 'v1', status: 'PASS', role: 'Agent C', report: 'docs/browser.md' };
+test('repository current task stays visible after historical task archival', async () => {
+  const tasks = parseTasks(await readFile(new URL('../TASKS.md', import.meta.url), 'utf8'));
+  assert.equal(tasks.length, 1);
+  assert.notEqual(tasks[0].status, 'UNKNOWN');
+});
 test('deduplicates completed tasks without overwriting explicit status', () => {
   const tasks = parseTasks('### Task 035 — Rapport\n**Status:** READY FOR BROWSER REVIEW\n## Completed\n- Task 035 — Rapport — `APPROVED`.\n- Task 001 — Structuur.');
   assert.equal(tasks.length, 2);

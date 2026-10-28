@@ -10,7 +10,7 @@ import {createBatterySimulator} from "@crems/core/battery-simulation";
 import {createBatteryDailyCollector} from "../src/battery-daily-report.ts";
 import {brusselsContractDay} from "../src/day-window.ts";
 
-const source = await readFile(new URL("../src/App.tsx", import.meta.url), "utf8");
+const source = await readFile(new URL("../src/App.tsx", import.meta.url), "utf8") + '\nexport {PowerHistoryPanel};';
 
 test("batterij is alleen bereikbaar via een succesvol gecontroleerd tijdelijk bestand", () => {
   assert.doesNotMatch(source, />Batterij<\/button>/);
@@ -56,6 +56,125 @@ const chartCount=(tree:any)=>[...nodes(tree),...chartNodes(tree)].filter(n=>n.ty
 const text=(node:any):string=>Array.isArray(node)?node.map(text).join(""):node&&typeof node==="object"?text(node.props?.children):node==null||typeof node==="boolean"?"":String(node);
 const find=(tree:any,predicate:(n:any)=>boolean)=>{const node=nodes(tree).find(predicate);assert.ok(node,"expected UI element");return node;};
 const button=(tree:any,label:string)=>find(tree,n=>n.type==="button"&&text(n)===label);
+test("volledig scherm volgt browserexit, weigering en ruimt eventlistener op",async()=>{
+  const previous=globals.document;
+  const listeners=new Set<()=>void>();let requests=0,exits=0,fail=false;
+  const doc={fullscreenEnabled:true,fullscreenElement:null as object|null,
+    documentElement:{async requestFullscreen(){requests++;if(fail)throw Error("blocked");doc.fullscreenElement=doc.documentElement;for(const fn of listeners)fn();}},
+    async exitFullscreen(){exits++;doc.fullscreenElement=null;for(const fn of listeners)fn();},
+    addEventListener(_type:string,fn:()=>void){listeners.add(fn);},removeEventListener(_type:string,fn:()=>void){listeners.delete(fn);}};
+  globals.document=doc;const h=host(app.ChartFrame);
+  try{
+    const initial=h.render({children:"Synthetic chart"});initial.props.ref.current=doc.documentElement;h.flush();
+    await button(h.render(),"Grafiek op volledig scherm").props.onClick();assert.equal(requests,1);
+    assert.equal(button(h.render(),"Grafiek verkleinen").props["aria-pressed"],true);
+    await button(h.render(),"Grafiek verkleinen").props.onClick();assert.equal(exits,1);
+    await button(h.render(),"Grafiek op volledig scherm").props.onClick();
+    doc.fullscreenElement=null;for(const fn of listeners)fn();
+    assert.equal(button(h.render(),"Grafiek op volledig scherm").props["aria-pressed"],false);
+    fail=true;await button(h.render(),"Grafiek op volledig scherm").props.onClick();
+    assert.match(text(h.render()),/wijzigen lukte niet/);assert.equal(button(h.render(),"Grafiek op volledig scherm").props.disabled,false);
+    doc.fullscreenEnabled=false;await button(h.render(),"Grafiek op volledig scherm").props.onClick();
+    assert.match(text(h.render()),/hier niet beschikbaar/);
+  }finally{h.dispose();globals.document=previous;}
+  assert.equal(listeners.size,0);
+});
+
+test("kiosk houdt alleen de vergrote grafiek wakker en geeft ook een laat verkregen lock vrij",async()=>{
+  const previousDoc=globals.document,previousNavigator=Object.getOwnPropertyDescriptor(globalThis,"navigator");
+  const listeners=new Map<string,Set<()=>void>>();let requests=0,releases=0;
+  const locks:any[]=[];let complete:((value:any)=>void)|undefined;
+  const doc={fullscreenEnabled:true,fullscreenElement:null as object|null,visibilityState:"visible",
+    async exitFullscreen(){doc.fullscreenElement=null;},
+    addEventListener(type:string,fn:()=>void){if(!listeners.has(type))listeners.set(type,new Set());listeners.get(type)!.add(fn);},
+    removeEventListener(type:string,fn:()=>void){listeners.get(type)?.delete(fn);}};
+  const element={async requestFullscreen(){doc.fullscreenElement=element;}};
+  const makeLock=()=>{const value={released:false,addEventListener(){},async release(){value.released=true;releases++;}};locks.push(value);return value;};
+  Object.defineProperty(globalThis,"navigator",{configurable:true,value:{wakeLock:{request(){requests++;return new Promise(resolve=>{complete=resolve;});}}}});
+  globals.document=doc;const h=host(app.ChartFrame);
+  const settle=async()=>{await new Promise(resolve=>setTimeout(resolve,0));};
+  try{
+    h.render().props.ref.current=element;h.flush();assert.equal(requests,0);
+    await button(h.render(),"Grafiek op volledig scherm").props.onClick();h.render();h.flush();assert.equal(requests,1);
+    complete!(makeLock());await settle();assert.match(text(h.render()),/scherm blijft aan/);
+    await button(h.render(),"Grafiek verkleinen").props.onClick();h.render();h.flush();await settle();assert.equal(releases,1);
+    await button(h.render(),"Grafiek op volledig scherm").props.onClick();h.render();h.flush();assert.equal(requests,2);
+    h.dispose();complete!(makeLock());await settle();assert.equal(releases,2);
+    assert.equal([...listeners.values()].reduce((sum,set)=>sum+set.size,0),0);
+  }finally{
+    h.dispose();globals.document=previousDoc;
+    if(previousNavigator)Object.defineProperty(globalThis,"navigator",previousNavigator);else delete globals.navigator;
+  }
+});
+
+test("historyfout biedt echte retry; laden en andere states verbergen de actie",()=>{
+  let retries=0;
+  const panel=host(app.PowerHistoryPanel);
+  const props={selection:"yesterday",onSelection:()=>undefined,priceState:{status:"error"}};
+  const tree=panel.render({...props,state:{status:"error",retry:()=>{retries++;}}});
+  const action=button(tree,"Probeer verbruiksgeschiedenis opnieuw");
+  action.props.onClick(); assert.equal(retries,1);
+  for(const status of ["loading","empty","unavailable","future"]){
+    const next=panel.render({...props,state:{status,retry:()=>{retries++;}}});
+    assert.ok(!nodes(next).some(n=>n.type==="button"&&text(n)==="Probeer verbruiksgeschiedenis opnieuw"));
+  }
+  panel.dispose();
+});
+test("historypanel toont een eerder geslaagde dag nooit onder een nieuw kalenderdaglabel",()=>{
+  const RealDate=Date;
+  const panel=host(app.PowerHistoryPanel);
+  const data={start:"2026-10-14T22:00:00.000Z",end:"2026-10-15T21:59:40.000Z",quality:"measured",import:[{timestamp:"2026-10-15T21:59:00.000Z",powerW:420}],export:[]};
+  try{
+    for(const now of ["2026-10-15T22:00:05.000Z","2026-10-15T22:00:20.000Z"]){
+      globals.Date=class extends RealDate{constructor(value?:any){super(value===undefined?now:value);}};
+      const tree=panel.render({selection:"today",onSelection:()=>undefined,priceState:{status:"error"},state:{status:"success",data,retry:()=>undefined}});
+      assert.ok(!nodes(tree).some(n=>n.type==="svg"),"old measurements must not render under the new day");
+      assert.ok(!text(tree).includes("23:59"),"old measurement timestamps must not remain visible");
+      assert.match(text(tree),now.endsWith("05.000Z")?/Vandaag zijn nog geen metingen/:/De gekozen dag wordt geladen/);
+    }
+  }finally{globals.Date=RealDate;panel.dispose();}
+});
+test("historypanel tekent geen prijsreeks van de vorige kalenderdag",()=>{
+  const RealDate=Date,panel=host(app.PowerHistoryPanel);
+  try{
+    globals.Date=class extends RealDate{constructor(value?:any){super(value===undefined?"2026-10-15T22:00:20.000Z":value);}};
+    const tree=panel.render({selection:"today",onSelection:()=>undefined,state:{status:"unavailable",retry:()=>undefined},priceState:{status:"success",data:{day:"today",start:"2026-10-14T22:00:00.000Z",end:"2026-10-15T22:00:00.000Z",quality:"measured",points:[{timestamp:"2026-10-15T21:00:00.000Z",end:"2026-10-15T22:00:00.000Z",priceCtKwh:123.45}]}}});
+    assert.ok(!nodes(tree).some(n=>typeof n.type==="function"&&n.type.name==="PriceOnlyChart"));
+  }finally{globals.Date=RealDate;panel.dispose();}
+});
+test("echte historyhooks herladen vandaag en gisteren bij kalenderdagwissel, niet bij iedere render",async()=>{
+  const hookBundle=await build({stdin:{contents:'export {usePowerHistory} from "./use-power-history"; export {usePriceHistory} from "./use-price-history";',resolveDir:fileURLToPath(new URL("../src/",import.meta.url)),loader:"ts"},bundle:true,write:false,format:"esm",platform:"node",logLevel:"silent",plugins:[{name:"history-hook-host",setup(b){
+    b.onResolve({filter:/^react$/},()=>({path:"react",namespace:"history-hooks"}));
+    b.onLoad({filter:/.*/,namespace:"history-hooks"},()=>({contents:'export const useState=(...a)=>globalThis.__batteryHooks.useState(...a); export const useMemo=(...a)=>globalThis.__batteryHooks.useMemo(...a); export const useEffect=(...a)=>globalThis.__batteryHooks.useEffect(...a);'}));
+  }}]});
+  const actualHooks=await import(`data:text/javascript;base64,${Buffer.from(hookBundle.outputFiles[0]!.text).toString("base64")}`);
+  const RealDate=Date,originalFetch=globals.fetch,originalWindow=globals.window,originalDocument=globals.document;
+  let now="2026-10-15T21:59:50.000Z";
+  globals.Date=class extends RealDate{constructor(value?:any){super(value===undefined?now:value);}static now(){return RealDate.parse(now);}};
+  const timers=new Set<number>();let timer=0;
+  globals.window={setInterval:()=>{timers.add(++timer);return timer;},clearInterval:(id:number)=>timers.delete(id)};
+  globals.document={hidden:false,addEventListener:()=>undefined,removeEventListener:()=>undefined};
+  try{
+    for(const useHistory of [actualHooks.usePowerHistory,actualHooks.usePriceHistory])for(const selection of ["today","yesterday"]){
+      const requests:Array<{url:string;signal:AbortSignal}>=[];
+      globals.fetch=(url:string,options:{signal:AbortSignal})=>{requests.push({url,signal:options.signal});return new Promise(()=>{});};
+      now="2026-10-15T21:59:50.000Z";
+      const runner=host(()=>useHistory(true,selection));
+      try{
+        runner.render();runner.flush();assert.equal(requests.length,1);
+        now="2026-10-15T21:59:55.000Z";runner.render();runner.flush();assert.equal(requests.length,1);
+        now="2026-10-15T22:00:20.000Z";runner.render();runner.flush();
+        assert.equal(requests.length,2);
+        const query=new URL(requests[1].url,"http://qa.test/").searchParams;
+        if(useHistory===actualHooks.usePowerHistory){assert.equal(requests[0].signal.aborted,true);assert.equal(query.get("start"),selection==="today"?"2026-10-15T22:00:00.000Z":"2026-10-14T22:00:00.000Z");}
+        else assert.equal(query.get("day"),selection);
+        runner.render();runner.flush();assert.equal(requests.length,2);
+      }finally{runner.dispose();}
+      if(useHistory===actualHooks.usePowerHistory)assert.equal(requests.at(-1)?.signal.aborted,true);
+      assert.equal(timers.size,0);
+    }
+  }finally{globals.Date=RealDate;globals.fetch=originalFetch;globals.window=originalWindow;globals.document=originalDocument;}
+});
 const waitFor=async(check:()=>boolean)=>{for(let i=0;i<100;i++){if(check())return;await new Promise(r=>setTimeout(r,1));}assert.fail("component did not settle");};
 test("lege navigatie legt voorwaarden uit en laat contractformulier zonder lokaal profiel openen",()=>{
   globals.window={localStorage:{getItem:()=>null}};

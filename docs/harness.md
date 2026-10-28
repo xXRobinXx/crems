@@ -1,5 +1,9 @@
 # Lokaal CREMS-harness
 
+## Actuele taak versus historiek — 14 oktober 2026
+
+TASKS.md bevat uitsluitend de actuele canonieke `### Task`-sectie met expliciete status. `node tools/task-context.mjs` geeft de scope; `node tools/harness.mjs status` geeft de actuele parserstatus. Oudere taken staan byte-identiek in docs/history/tasks-2026-10-14.md en worden niet automatisch als huidige status geladen. Historische evidencepaden blijven behouden; relatieve verwijzingen in de snapshot hebben de oorspronkelijke root als basis. De bestaande Task035-melding in statusuitvoer is historische toelichting, geen actieve taak. Archiveren verandert het fingerprint; oude attestaties zijn geen nieuwe releasegoedkeuring.
+
 ## Actualisering — 1 oktober 2026 / Task 061
 
 Historische productprioriteiten: Task 060 maakte Contract bereikbaar zonder Energiepaspoort; de disabled-contractbeschrijving hieronder is vervangen. De actuele actieve taak is Task 061. Het harnessmechanisme blijft geldig; releasegate vereist actuele volledige review/browserattestaties.

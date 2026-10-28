@@ -78,7 +78,7 @@ Securityreview van Home Assistant Ingress controleert ook productiegedrag: genes
 
 ## Concrete handoff
 
-Agent A geeft Agent B uitsluitend de huidige taak uit `TASKS.md`. Een geldige handoff bevat: doel, expliciete scope/non-goals, toegestane bestanden, meetbare acceptance criteria en exacte validatiecommando's. Agent B meldt na uitvoering: gewijzigde bestanden, gedragsbewijs per criterium, commandoresultaten en resterende risico's.
+Agent A geeft Agent B uitsluitend de huidige taak uit `TASKS.md`. Een geldige handoff bevat: doel, eigenaar, expliciete scope/non-goals, toegestane bestanden, meetbare acceptance criteria, exacte validatiecommando's en concrete volgende stap. Bij vervolgwerk bevat ze ook laatste teststatus, bewijslinks en open gates. Agent B meldt na uitvoering: gewijzigde bestanden, gedragsbewijs per criterium, commandoresultaten en resterende risico's. Verwijs naar bewijs in plaats van volledige logs of taakhistorie te kopiëren; controleer actualiteit vóór hergebruik.
 
 Agent A controleert daarna zelf de diff of volledige gewijzigde bestanden en herhaalt de validatie. De review eindigt in één van deze gates:
 

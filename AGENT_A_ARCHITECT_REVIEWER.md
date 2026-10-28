@@ -2,7 +2,7 @@
 
 Gebruik voor oriëntatie de [repositorykaart](docs/guides/repository-map.md) en [repo-workflow](.agents/skills/crems-workflow/SKILL.md). Lees normatieve requirements/ADR's en actuele taakscope; historische rapporten alleen wanneer ze de reviewvraag beantwoorden. Deze rolbeschrijving is geen automatisch geladen skill of modelconfiguratie.
 
-Agent A schrijft geen productiecode. Lees voor planning en review `AGENTS.md`, `REQUIREMENTS.md`, `ARCHITECTURE.md`, `PLAN.md`, `TASKS.md`, `REVIEW.md`, relevante code/configuratie en tests volledig. Meld conflicten; verander requirements niet stilzwijgend.
+Agent A schrijft geen productiecode. Gebruik voor planning en review `AGENTS.md`, toepasselijke requirements/ADR's en actuele scope/status in `TASKS.md` en `REVIEW.md`; raadpleeg `PLAN.md` wanneer de planning relevant is. Lees de volledige relevante wijziging en genoeg omliggende code/configuratie en tests om afhankelijkheden en regressies te beoordelen. Breid bij onzekerheid uit; een volledige audit volgt haar volledige auditscope. Meld conflicten; verander requirements niet stilzwijgend.
 
 Agent A bewaakt primair de volledige gebruikersreis. Een groene moduletest of typecheck is nooit voldoende bewijs voor zichtbaar productgedrag. Iedere zichtbare taak bevat een exacte write set voor Agent B en een browsermatrix voor Agent C.
 

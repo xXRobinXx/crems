@@ -1,3 +1,12 @@
+## Actualisering 19 oktober 2026
+
+[Actuele afrondingscontrole](docs/reviews/task-061-closeout-2026-10-19.md): 383 tests en structuur/build/typecheck PASS; Pi 0.1.18 started via Tailscale, direct LAN onbereikbaar. Nieuwe 24-uursmeting loopt; geen stabiliteits-PASS of algemene releasegoedkeuring. Hostherstart/gegevensbehoud was op 16 oktober bewezen. Restorehost, LAN-route, providerrechten/configuratie en release/browsergates blijven open. Geen productiecode gewijzigd.
+
+## Task061 — 16 oktober 2026 — lokale CODE/UI APPROVED; release IN PROGRESS
+
+Onafhankelijke read-only reviewer `/root/final_review`: geen P1/P2-bevindingen; eigen53+2tests PASS. Finale root383tests, structuur/build/typecheck PASS, stable fingerprint045b166454ef570d81ce594c4a30ad95997ab6d7831e45921e3feda13317acc5. Actuele lokale desktop-/mobielbrowsermatrix PASS beoordeeld. [Definitief reviewbesluit en bewijsgrenzen](docs/reviews/task-061-final-review-2026-10-16.md).
+
+Kandidaat niet uitgerold; fysieke LAN, hostherstartbehoud, echte Supervisorrestore/rollback, langdurige hardwarestabiliteit, live provider en volledige productaudit blijven open. Geen volledige releaseattestatie.
 # Review
 
 ## Task 061 — twee cleanup-rondes — CODE APPROVED / gebruikersrelease CHANGES REQUIRED
@@ -1105,3 +1114,7 @@ De audit in `PRODUCT_AUDIT.md` heeft vastgesteld dat eerdere modulegoedkeuringen
 
 Actuele netwerkbevinding Task 061 (1 oktober): de huidige pc heeft Wi-Fi-adres `192.168.0.243/24`, gateway `192.168.0.1`; de Pi heeft `192.168.88.253/24`, gateway `192.168.88.1`. Ze zitten in verschillende IPv4-subnets. De directe timeout past bij ontbrekende routering tussen deze netwerken; de routerconfiguratie is niet gecontroleerd of gewijzigd. De pc moet toegang krijgen tot het Pi-subnet (bijvoorbeeld hetzelfde niet-geïsoleerde thuisnetwerk) of een bestaande route gebruiken. De tijdens deze run werkende toegang gebruikt [Home Assistant via Tailscale](http://homeassistant.tail582404.ts.net:8123/hassio/ingress/350f0e24_crems_energy). Er is geen bewijs dat een willekeurig apparaat op het Pi-subnet niet kan verbinden.
 Actuele `pnpm harness gate`: **NOT APPROVED**. Voor deze fingerprint ontbreekt een volledige Agent A APPROVED-attestatie en een Agent C PASS-attestatie. De beperkte tool-/test-/docreview hierboven vervangt deze volledige releaseattestaties niet. Er is geen attestatie vervaardigd of aangepast om de gate te passeren; de volledige release blijft CHANGES REQUIRED.
+# Actuele beperkte 0.1.19-review — 28 oktober 2026
+
+[Release019-review](docs/reviews/task-061-release019-review-2026-10-28.md): APPROVED door root in sequentiële Agent A-rol voor uitsluitend de expliciet geautoriseerde beperkte update; geen onafhankelijke volledige audit. Actuele volledige harness PASS, producttests369/369/tooling16/16; kandidaatbrowsermatrix zeven scenario's PASS. Gebruiker geeft expliciet uitzondering voor24uursmeting en geïsoleerde restoreproef, die open blijven. Protected backup3cd147ed bevestigd. Installatie/runtimebewijs volgt afzonderlijk; geen nageclaimde Pi-upgrade op dit reviewmoment.
+

@@ -3,8 +3,9 @@
   "private": true,
   "packageManager": "pnpm@11.19.0",
   "scripts": {
+    "context:task": "node tools/task-context.mjs",
     "harness": "node tools/harness.mjs",
-    "test:harness": "node --test tools/harness.test.mjs tools/check-structure.test.mjs",
+    "test:harness": "node --test tools/harness.test.mjs tools/check-structure.test.mjs tools/task-context.test.mjs",
     "check:structure": "node tools/check-structure.mjs",
     "test:structure": "node --test tools/check-structure.test.mjs",
     "dev": "pnpm --parallel --filter @crems/bridge --filter @crems/web dev",

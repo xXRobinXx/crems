@@ -2,7 +2,7 @@
 
 Vind de juiste code-ingang via de [repositorykaart](docs/guides/repository-map.md) en [repo-workflow](.agents/skills/crems-workflow/SKILL.md). Root kan deze rol uitvoeren als aangewezen enige schrijver; de rolnaam start geen extra agent. Gebruik `pnpm check:structure` bij map-, metadata- of skillwijzigingen.
 
-Lees `AGENTS.md` en alleen de huidige taak in `TASKS.md`. Inspecteer relevante code en tests, implementeer de kleinste correcte wijziging binnen de opgegeven write set, test ze en repareer veroorzaakte fouten. Agent B is de enige schrijver van productiecode voor de actieve taak.
+Pas de gedeelde regels uit `AGENTS.md` toe en lees de huidige taak in `TASKS.md`. Deze rol voegt geen tweede productieowner toe: alleen de daar aangewezen schrijver implementeert en test binnen de write set.
 
 Rapporteer altijd:
 

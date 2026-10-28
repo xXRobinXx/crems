@@ -1,3 +1,17 @@
+## Actualisering 19 oktober 2026
+
+[Actuele afrondingscontrole](docs/reviews/task-061-closeout-2026-10-19.md): 383 tests en structuur/build/typecheck PASS; Pi 0.1.18 started via Tailscale, direct LAN onbereikbaar. Nieuwe 24-uursmeting loopt; geen stabiliteits-PASS of algemene releasegoedkeuring. Hostherstart/gegevensbehoud was op 16 oktober bewezen. Restorehost, LAN-route, providerrechten/configuratie en release/browsergates blijven open. Geen productiecode gewijzigd.
+
+## Operationeel vervolg — 16 oktober 2026, na17:09Brussels
+
+[Echte HAOS-hostherstart](docs/reviews/task-061-host-reboot-2026-10-16.md) technisch PASS: vers protected CREMS-herstelpunt, nieuwe boot,0.1.18 started, Ingress200, profielv2 en rapportv3 inhoudelijk exact behouden; live measured/actueel hersteld. Geen kandidaatuitrol of restore; geen nieuwe HA-browsercontrole. [Root-auditvervolg](docs/reviews/task-061-product-audit-followup-2026-10-16.md) heeft de requirementsketens en eerdere P1-bevindingen gecontroleerd, met expliciete dekking/grenzen; geen onafhankelijke volledige auditclaim.
+
+Langdurige24uursmeting wordt afzonderlijk vastgelegd in .harness/task061-stability-24h-status.json; alleen COMPLETE metpass=true sluit die meetperiode. FysiekeLAN blijft geblokkeerd en er is geen geïsoleerde HAOS-restorehost. Complete externe providerconfiguratie ontbreekt. De hieronder genoemde hostherstart-NOTRUNstatussen zijn eerdere momentopnamen.
+## Actuele kandidaatcontrole — 16 oktober 2026
+
+Task061 herstelt historie/retries en Brussels dagwissel voor vermogen en prijs. Finale lokale kandidaat: app-233a83289c4346f8.js. [Lokale browsermatrix](docs/reviews/task-061-final-local-qa-2026-10-16.md) PASS binnen synthetische desktop-/mobielscope, inclusief centrale opslag en financieel rapport. Finale volledige check en onafhankelijke beslissing staan in [eindreview](docs/reviews/task-061-final-review-2026-10-16.md).
+
+Pi draait nog0.1.18; deze kandidaat is niet uitgerold. [Actuele read-only operationele controle](docs/reviews/task-061-final-operations-2026-10-16.md): Ingress en120sSSE PASS, actuele Supervisorbackup16oktober03:00:39UTC. Fysiek LAN, hostherstartbehoud, echte Supervisorrestore/rollback en langdurige hardwarestabiliteit blijven open, evenals live providerrechten en volledige productaudit. Geen volledige releasegoedkeuring. Onderstaande baselines zijn gedateerd historisch bewijs.
 ## Actuele verbindingsrelease — 14 oktober 2026
 
 **Pi 0.1.18 draait**, met backup en actuele gebruikersbrowser-PASS: nieuwe assets geladen, Home Assistant live zichtbaar na refresh en Batterij→Contract; profiel en batterijrapport behouden. [Deploymentbewijs](docs/reviews/task-061-deployment018-2026-10-14.md). Verbindingsherstel afgerond met368tests, onafhankelijkeAPPROVED en synthetische fallback/uitval/herstel-browserPASS. Initieel verbinden en herstel zijn onderscheiden; oude waarden verliezen Live-label. De oorspronkelijke intermitterende SSEoorzaak blijft onzeker; geen garantie tegen netwerkuitval. Open operationele controles blijven fysiekeLAN, echteSupervisorrestore/rollback, hostherstartbehoud en langdurigehardwarestabiliteit. Hieronder staan gedateerde eerdere stappen. Root enige productiewriter; dit vervolg verandert alleen bewijs en documentatie, write set aangevuld met PRODUCT_AUDIT.md.
