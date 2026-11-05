@@ -80,33 +80,30 @@ test("volledig scherm volgt browserexit, weigering en ruimt eventlistener op",as
   assert.equal(listeners.size,0);
 });
 
-test("kiosk houdt alleen de vergrote grafiek wakker en geeft ook een laat verkregen lock vrij",async()=>{
+test("grafiek-fullscreen neemt de tienminutenregeling van de tablet niet over",async()=>{
   const previousDoc=globals.document,previousNavigator=Object.getOwnPropertyDescriptor(globalThis,"navigator");
-  const listeners=new Map<string,Set<()=>void>>();let requests=0,releases=0;
-  const locks:any[]=[];let complete:((value:any)=>void)|undefined;
-  const doc={fullscreenEnabled:true,fullscreenElement:null as object|null,visibilityState:"visible",
+  const listeners=new Set<()=>void>();let requests=0;
+  const doc={fullscreenEnabled:true,fullscreenElement:null as object|null,
     async exitFullscreen(){doc.fullscreenElement=null;},
-    addEventListener(type:string,fn:()=>void){if(!listeners.has(type))listeners.set(type,new Set());listeners.get(type)!.add(fn);},
-    removeEventListener(type:string,fn:()=>void){listeners.get(type)?.delete(fn);}};
+    addEventListener(_type:string,fn:()=>void){listeners.add(fn);},
+    removeEventListener(_type:string,fn:()=>void){listeners.delete(fn);}};
   const element={async requestFullscreen(){doc.fullscreenElement=element;}};
-  const makeLock=()=>{const value={released:false,addEventListener(){},async release(){value.released=true;releases++;}};locks.push(value);return value;};
-  Object.defineProperty(globalThis,"navigator",{configurable:true,value:{wakeLock:{request(){requests++;return new Promise(resolve=>{complete=resolve;});}}}});
+  Object.defineProperty(globalThis,"navigator",{configurable:true,value:{wakeLock:{async request(){requests++;throw Error("No permanent wake lock allowed");}}}});
   globals.document=doc;const h=host(app.ChartFrame);
-  const settle=async()=>{await new Promise(resolve=>setTimeout(resolve,0));};
   try{
-    h.render().props.ref.current=element;h.flush();assert.equal(requests,0);
-    await button(h.render(),"Grafiek op volledig scherm").props.onClick();h.render();h.flush();assert.equal(requests,1);
-    complete!(makeLock());await settle();assert.match(text(h.render()),/scherm blijft aan/);
-    await button(h.render(),"Grafiek verkleinen").props.onClick();h.render();h.flush();await settle();assert.equal(releases,1);
-    await button(h.render(),"Grafiek op volledig scherm").props.onClick();h.render();h.flush();assert.equal(requests,2);
-    h.dispose();complete!(makeLock());await settle();assert.equal(releases,2);
-    assert.equal([...listeners.values()].reduce((sum,set)=>sum+set.size,0),0);
+    h.render().props.ref.current=element;h.flush();
+    await button(h.render(),"Grafiek op volledig scherm").props.onClick();h.render();h.flush();
+    assert.equal(button(h.render(),"Grafiek verkleinen").props["aria-pressed"],true);
+    assert.equal(requests,0);
+    assert.doesNotMatch(text(h.render()),/wakker blijven tijdens opladen|scherm blijft aan/);
+    await button(h.render(),"Grafiek verkleinen").props.onClick();h.render();h.flush();
+    assert.equal(requests,0);
   }finally{
     h.dispose();globals.document=previousDoc;
     if(previousNavigator)Object.defineProperty(globalThis,"navigator",previousNavigator);else delete globals.navigator;
   }
+  assert.equal(listeners.size,0);
 });
-
 test("historyfout biedt echte retry; laden en andere states verbergen de actie",()=>{
   let retries=0;
   const panel=host(app.PowerHistoryPanel);

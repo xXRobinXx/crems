@@ -12,7 +12,7 @@ const bundled = await build({entryPoints:[fileURLToPath(new URL("../src/App.tsx"
   b.onLoad({filter:/App\.tsx$/},()=>({contents:source.replaceAll('new Date()', 'new Date("2026-09-22T12:00:00.000Z")')+'\nexport {PowerHistoryPanel};',loader:"tsx"}));
   b.onLoad({filter:/price-chart\.ts$/},async args=>({contents:(await readFile(args.path,"utf8")).replaceAll('Date.now()', 'Date.parse("2026-09-22T12:00:00.000Z")'),loader:"ts"}));
 }}]});
-const {PowerHistoryPanel} = await import(`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0]!.text).toString("base64")}`);
+const {PowerHistoryPanel,ChartLiveReadings} = await import(`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0]!.text).toString("base64")}`);
 type Element = {type:any;props:any};
 function expand(value:any):any {
   if(Array.isArray(value))return value.map(expand);
@@ -29,8 +29,33 @@ const render=(selection:"today"|"tomorrow", priceStatus="success", powerStatus="
   const timestamp=(hour:number)=>new Date(Date.parse(window.start)+hour*3600000).toISOString();
   const price={day:selection,...window,quality:"measured",points:[{timestamp:timestamp(0),priceCtKwh:-2},{timestamp:timestamp(1),priceCtKwh:5},{timestamp:timestamp(2),priceCtKwh:0}]};
   const power={...window,quality:"measured",import:[{timestamp:timestamp(0),powerW:100},{timestamp:timestamp(1),powerW:200}],export:[{timestamp:timestamp(0),powerW:30},{timestamp:timestamp(1),powerW:40}]};
-  return expand(PowerHistoryPanel({selection,onSelection:()=>{},state:powerStatus==="success"?{status:"success",data:power}:{status:powerStatus},priceState:priceStatus==="success"?{status:"success",data:price}:{status:priceStatus}}));
+  return expand(PowerHistoryPanel({selection,onSelection:()=>{},fullscreenSummary:ChartLiveReadings({reading:liveReading,connected:true,priceCents:34.4}),state:powerStatus==="success"?{status:"success",data:power}:{status:powerStatus},priceState:priceStatus==="success"?{status:"success",data:price}:{status:priceStatus}}));
 };
+const liveReading={timestamp:"2026-09-22T12:00:00.000Z",importPowerW:1800,exportPowerW:250,importEnergyKwh:12,exportEnergyKwh:3,quality:"measured",source:"home-assistant"};
+
+test("vergrote grafiek krijgt actuele injectie, verbruik en prijs onafhankelijk van de grafiekdag",()=>{
+  for(const day of ["today","tomorrow"] as const){
+    const summary=elements(render(day)).find(n=>n.props.className==="fullscreen-summary");
+    assert.ok(summary);
+    const values=elements(summary).filter(n=>n.type==="dd").map(n=>n.props.children);
+    assert.deepEqual(values,["250 W","1.800 W","34,4 ct/kWh"]);
+    const labels=elements(summary).filter(n=>n.type==="dt").map(n=>n.props.children);
+    assert.deepEqual(labels,["Injectie nu","Verbruik nu","Prijs nu"]);
+  }
+});
+
+test("kioskwaarden houden demo, schatting, offline en onvolledige data herkenbaar",()=>{
+  const show=(reading:any,connected=true,priceCents:number|undefined=undefined)=>JSON.stringify(expand(ChartLiveReadings({reading,connected,priceCents})));
+  assert.match(show({...liveReading,source:"simulator"}),/Demo · gesimuleerd/);
+  assert.match(show({...liveReading,quality:"estimated"}),/Geschatte meting/);
+  assert.match(show(liveReading,false),/Laatste meting · offline/);
+  const incomplete=elements(expand(ChartLiveReadings({reading:{...liveReading,quality:"incomplete",exportPowerW:0},connected:true})));
+  assert.equal(incomplete.find(n=>n.type==="dd").props.children,"—");
+  assert.match(JSON.stringify(incomplete),/Onvolledige meting/);
+  assert.match(show(undefined),/Geen meting/);
+  assert.match(show(liveReading),/Geen gepubliceerde spotprijs/);
+  assert.match(show(liveReading,true,-2.3),/-2,3 ct\/kWh/);
+});
 
 test("vandaag behoudt vermogen en prijs in precies één SVG met afzonderlijke assen",()=>{
   const tree=render("today"),nodes=elements(tree),svg=nodes.filter(n=>n.type==="svg");

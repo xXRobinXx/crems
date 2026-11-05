@@ -13,6 +13,7 @@ import { brusselsChartTime, chartTimeTicks, type ChartWindow } from "./chart-tim
 import { loadLocalEnergyProfile, profileFromPreview, removeLocalEnergyProfile, saveLocalEnergyProfile, type LocalEnergyProfile } from "./local-energy-profile";
 import { createEnergyReport } from "./energy-report";
 import type { BatterySimulationResult } from "@crems/core/battery-simulation";
+import type { LiveMeterReading } from "@crems/core";
 import {convertLegacyReport,getBrowserStorage,loadBatteryStorageState,removeBatteryStorage,saveBatteryReport,type BatteryFinancialSnapshot,type BatteryStorageState,type LocalBatteryReport } from "./local-battery-analysis";
 import {loadBelpexHistory } from "./belpex-history";
 import {createBatteryReportController,resolveFinancialSnapshot,type BatteryRunState} from "./battery-report-controller";
@@ -32,12 +33,11 @@ const emptyContract=(name:string):FlatContractDraft=>({name,type:"fixed",validFr
 const browserStorage=()=>getBrowserStorage(typeof window==="undefined"?undefined:window);
 const savedResultPrivacy = "Bij bewaren komt een kopie van de veilige resultaten in deze browser en proberen we ze te synchroniseren met jouw Raspberry Pi. Gebruikers met toegang tot CREMS via jouw Home Assistant kunnen die resultaten ook openen.";
 
-export function ChartFrame({ children }: { children: ReactNode }) {
+export function ChartFrame({ children, summary }: { children: ReactNode; summary?: ReactNode }) {
   const frame = useRef<HTMLElement>(null);
   const [active, setActive] = useState(false);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string>();
-  const [wakeMessage, setWakeMessage] = useState<string>();
   useEffect(() => {
     if (typeof document === "undefined") return;
     const sync = () => setActive(Boolean(frame.current && document.fullscreenElement === frame.current));
@@ -45,40 +45,6 @@ export function ChartFrame({ children }: { children: ReactNode }) {
     document.addEventListener("fullscreenchange", sync);
     return () => document.removeEventListener("fullscreenchange", sync);
   }, []);
-  useEffect(() => {
-    if (!active) return;
-    if (typeof navigator === "undefined" || !navigator.wakeLock) {
-      setWakeMessage("Kioskweergave · laat de tablet opladen en schakel wakker blijven tijdens opladen in.");
-      return;
-    }
-    let disposed = false;
-    let requesting = false;
-    let lock: WakeLockSentinel | undefined;
-    const hidden = () => document.visibilityState === "hidden";
-    setWakeMessage("Kioskweergave · scherm wakker houden aanvragen…");
-    const acquire = async () => {
-      if (disposed || hidden() || requesting || (lock && !lock.released)) return;
-      requesting = true;
-      try {
-        const next = await navigator.wakeLock.request("screen");
-        if (disposed || hidden()) { await next.release(); return; }
-        lock = next;
-        setWakeMessage("Kioskweergave · scherm blijft aan.");
-        next.addEventListener("release", () => {
-          if (!disposed && lock === next) setWakeMessage("Scherm wakker houden is onderbroken. Houd de tablet aan de lader; bij terugkeer proberen we opnieuw.");
-        }, { once: true });
-      } catch {
-        if (!disposed) setWakeMessage("De browser houdt het scherm niet wakker. Laat de tablet opladen en gebruik wakker blijven tijdens opladen.");
-      } finally { requesting = false; }
-    };
-    void acquire();
-    document.addEventListener("visibilitychange", acquire);
-    return () => {
-      disposed = true;
-      document.removeEventListener("visibilitychange", acquire);
-      void lock?.release().catch(() => undefined);
-    };
-  }, [active]);
   const toggle = async () => {
     if (pending) return;
     setMessage(undefined);
@@ -98,11 +64,20 @@ export function ChartFrame({ children }: { children: ReactNode }) {
     }
   };
   return <article ref={frame} className="panel chart-panel fullscreen-chart">
-    <div className="fullscreen-control"><button type="button" className="fullscreen-toggle" aria-pressed={active} disabled={pending} onClick={toggle}>{active ? "Grafiek verkleinen" : "Grafiek op volledig scherm"}</button>
+    <div className="fullscreen-control"><button type="button" className="fullscreen-toggle" aria-label={active ? "Grafiek verkleinen" : "Grafiek op volledig scherm"} title={active ? "Grafiek verkleinen" : "Grafiek op volledig scherm"} aria-pressed={active} disabled={pending} onClick={toggle}>{active ? "Grafiek verkleinen" : "Grafiek op volledig scherm"}</button>
     {message && <p role="status">{message}</p>}
-    {active && wakeMessage && <p role="status">{wakeMessage}</p>}
-    </div>{children}
+    </div>{summary && <div className="fullscreen-summary">{summary}</div>}{children}
   </article>;
+}
+
+export function ChartLiveReadings({ reading, connected, priceCents, priceRefreshError = false }: { reading?: LiveMeterReading; connected: boolean; priceCents?: number; priceRefreshError?: boolean }) {
+  const quality = !reading ? "Geen meting" : reading.source === "simulator" ? "Demo · gesimuleerd" : !connected ? "Laatste meting · offline" : reading.quality === "incomplete" ? "Onvolledige meting" : reading.quality === "estimated" ? "Geschatte meting" : "Live gemeten";
+  const power = (value: number | undefined) => value === undefined || !Number.isFinite(value) || (reading?.quality === "incomplete" && value === 0) ? "—" : `${value.toLocaleString("nl-BE")} W`;
+  return <dl className="chart-live-readings" aria-label="Actuele injectie, verbruik en spotprijs; onafhankelijk van de gekozen grafiekdag">
+    <div className="chart-live-injection"><dt>Injectie nu</dt><dd>{power(reading?.exportPowerW)}</dd><small>{quality}</small></div>
+    <div className="chart-live-consumption"><dt>Verbruik nu</dt><dd>{power(reading?.importPowerW)}</dd><small>{quality}</small></div>
+    <div className="chart-live-price"><dt>Prijs nu</dt><dd>{priceCents === undefined || !Number.isFinite(priceCents) ? "—" : `${priceCents.toLocaleString("nl-BE", { maximumFractionDigits: 1 })} ct/kWh`}</dd><small>{priceCents === undefined ? "Geen gepubliceerde spotprijs" : priceRefreshError ? "Spotprijs · verversen mislukt" : "Gepubliceerde spotprijs"}</small></div>
+  </dl>;
 }
 
 export function App() {
@@ -235,7 +210,7 @@ export function App() {
         <article><span>Spotprijs volgend uur</span><strong>{nextPriceCents == null ? "—" : `${nextPriceCents.toLocaleString("nl-BE", { maximumFractionDigits: 1 })} ct`}</strong><small>{nextPriceCents == null ? "geen gepubliceerde spotprijs" : "spotprijs via Energy-Charts.info"}</small></article>
       </section>
       <section className="content-grid">
-        <PowerHistoryPanel state={history} priceState={priceHistory} selection={historyDay} onSelection={setHistoryDay} />
+        <PowerHistoryPanel state={history} priceState={priceHistory} selection={historyDay} onSelection={setHistoryDay} fullscreenSummary={<ChartLiveReadings reading={reading} connected={connected} priceCents={currentPriceCents} priceRefreshError={todayPriceHistory.status === "success" && Boolean(todayPriceHistory.refreshError)} />} />
         <aside className="panel advice"><span className="pill">{batteryAnalysis?"Lokaal resultaat klaar":"Persoonlijke analyse"}</span><h2>{batteryAnalysis?"Bekijk je batterijscenario":"Start met je Fluvius-data"}</h2><p>{batteryAnalysis?`Je bewaarde vergelijking gebruikt data tot ${new Date(batteryAnalysis.quality.period.end).toLocaleDateString("nl-BE")}.`:"Controleer je Fluvius-CSV in deze browser. Jij kiest daarna of je veilige resultaten bewaart en met jouw Pi synchroniseert."}</p><button className="primary" onClick={() => setPage(batteryAnalysis?"battery":"import")}>{batteryAnalysis?"Bekijk batterijresultaat":"Controleer CSV"}</button></aside>
       </section>
     </>}
@@ -347,7 +322,7 @@ function EnergyReportPage({ profile, onOpenImport }: { profile: LocalEnergyProfi
   return <section className="workspace report"><div className="report-top"><div><p className="eyebrow">Lokaal Energiepaspoort</p><h1>Je energiebalans.</h1><p className="intro">{new Date(profile.period.start).toLocaleDateString("nl-BE")} – {new Date(profile.period.end).toLocaleDateString("nl-BE")} · opgeslagen tijdsbereik {format(report.elapsedHours)} uur.</p></div><div className="report-badge"><strong>Lokale resultaten</strong><span>Browserkopie · synchronisatie met jouw Pi</span></div></div><section className="balance-hero"><span>Netto uitwisseling met het net</span><strong>{format(report.balance.magnitudeKwh)} kWh</strong><h2>{balanceLabel}</h2><p>Netto = afname van het net − injectie naar het net.</p></section><div className="report-layout"><section className="balance-card"><h2>Energiebalans</h2><div className="flow-values"><div><span>Afname van het net</span><strong>{format(report.import.totalKwh)} kWh</strong><small>{format(report.averagePer24Hours.importKwh)} kWh gemiddeld per 24 uur · {report.import.estimatedPercent == null ? "n.v.t." : `${format(report.import.estimatedPercent)}% geschat`}</small></div><div><span>Injectie naar het net</span><strong className="green">{format(report.export.totalKwh)} kWh</strong><small>{format(report.averagePer24Hours.exportKwh)} kWh gemiddeld per 24 uur · {report.export.estimatedPercent == null ? "n.v.t." : `${format(report.export.estimatedPercent)}% geschat`}</small></div></div><div className="composition" role="img" aria-label={report.gridFlowShares.importPercent == null ? "Geen geregistreerde netuitwisseling" : `Verdeling van geregistreerde netuitwisseling: ${format(report.gridFlowShares.importPercent)}% afname van het net en ${format(report.gridFlowShares.exportPercent ?? 0)}% injectie naar het net`}><i className="import-flow" style={{ width: `${report.gridFlowShares.importPercent ?? 0}%` }} /><i className="export-flow" style={{ width: `${report.gridFlowShares.exportPercent ?? 0}%` }} /></div><p className="chart-warning">Verdeling van geregistreerde netuitwisseling — geen productie of zelfverbruik.</p></section><section className="quality-card"><h2>Datakwaliteit</h2><strong>{format(quality.measured.percent)}% gemeten</strong><p>van {format(quality.totalCount)} geaccepteerde kwartieren</p><div className="quality-bar" role="img" aria-label={`Meetkwaliteit van kwartieren: ${quality.measured.count} gemeten (${format(quality.measured.percent)}%), ${quality.estimated.count} geschat (${format(quality.estimated.percent)}%), ${quality.noConsumption.count} zonder verbruik (${format(quality.noConsumption.percent)}%)`}><i className="quality-measured" style={{ width: `${quality.measured.percent}%` }} /><i className="quality-estimated" style={{ width: `${quality.estimated.percent}%` }} /><i className="quality-empty" style={{ width: `${quality.noConsumption.percent}%` }} /></div><ul><li>Gemeten: {format(quality.measured.count)} kwartieren</li><li>Geschat: {format(quality.estimated.count)} kwartieren</li><li>Geen verbruik: {format(quality.noConsumption.count)} kwartieren</li></ul></section></div><section className="report-details"><h2>Datakwaliteit & privacy</h2><p>Integriteitscontrole: {report.dataIntegrity.reliable===null?"onbekend (ouder profiel)":report.dataIntegrity.reliable?"betrouwbare bronvolgorde":"onbetrouwbare bronvolgorde"}. Gaten: {report.dataIntegrity.gapCount??"onbekend"} · dubbels: {report.dataIntegrity.duplicateCount??"onbekend"} · overlap: {report.dataIntegrity.overlapCount??"onbekend"}.</p><p>Gemeten afname/injectie: {format(report.import.measuredKwh)} / {format(report.export.measuredKwh)} kWh. Geschatte afname/injectie: {format(report.import.estimatedKwh)} / {format(report.export.estimatedKwh)} kWh.</p><p>Dit rapport bewaart geen CSV, EAN-code, meter-ID, bestandsnaam of kwartierregels. Maand-, uur- en piekgrafieken volgen pas wanneer die gegevens veilig en expliciet als samenvatting beschikbaar zijn.</p></section></section>;
 }
 
-function PowerHistoryPanel({ state: historyState, priceState: previousPriceState, selection, onSelection }: { state: ReturnType<typeof usePowerHistory>; priceState: ReturnType<typeof usePriceHistory>; selection: DaySelection; onSelection: (day: DaySelection) => void }) {
+function PowerHistoryPanel({ state: historyState, priceState: previousPriceState, selection, onSelection, fullscreenSummary }: { state: ReturnType<typeof usePowerHistory>; priceState: ReturnType<typeof usePriceHistory>; selection: DaySelection; onSelection: (day: DaySelection) => void; fullscreenSummary?: ReactNode }) {
   const selectedDay = selectBrusselsDayWindow(selection, new Date());
   const displayWindow = fullBrusselsDayWindow(selection, new Date());
   const state: ReturnType<typeof usePowerHistory> = historyState.status === "success" && historyState.data.start !== displayWindow.start
@@ -356,29 +331,29 @@ function PowerHistoryPanel({ state: historyState, priceState: previousPriceState
   const priceState: ReturnType<typeof usePriceHistory> = previousPriceState.status === "success" && previousPriceState.data.start !== displayWindow.start
     ? { status: "loading" }
     : previousPriceState;
-  const selector = <><DaySelector selection={selection} onSelection={onSelection} />{state.status === "error" && <button type="button" onClick={state.retry}>Probeer verbruiksgeschiedenis opnieuw</button>}</>;
+  const selector = <><DaySelector selection={selection} onSelection={onSelection} />{state.status === "error" && <button className="chart-retry" type="button" onClick={state.retry}>Probeer verbruiksgeschiedenis opnieuw</button>}</>;
   const priceData = priceState.status === "success" ? priceState.data : undefined;
   const priceScale = priceData?.points.length ? scalePriceHistory(priceData, displayWindow) : undefined;
   const head = <><ChartHead label={selectedDay.label} dateLabel={selectedDay.dateLabel} showPrice={Boolean(priceScale)} />{priceState.status === "success" && priceState.refreshError && <p className="chart-warning" role="status">De laatste prijsverversing lukte niet; de laatst geldige prijzen blijven zichtbaar.</p>}{priceState.status === "unavailable" && <p className="chart-warning" role="status">De prijsbron is niet bereikbaar.</p>}{priceState.status === "loading" && selection !== "tomorrow" && <p role="status">Energieprijzen worden geladen…</p>}{priceState.status === "error" && selection !== "tomorrow" && <p className="chart-warning" role="alert">De energieprijs kon niet worden geladen.</p>}{priceData?.quality === "notPublished" && selection !== "tomorrow" && <p role="status">De prijzen voor deze dag zijn nog niet gepubliceerd.</p>}</>;
   if (selection === "tomorrow") {
-    if (priceState.status === "unavailable") return <ChartFrame>{selector}{head}<p className="chart-state">Geen verbinding met de prijsbron.</p></ChartFrame>;
-    if (priceState.status === "loading") return <ChartFrame>{selector}{head}<p className="chart-state" role="status">De gepubliceerde energieprijzen voor morgen worden geladen…</p></ChartFrame>;
-    if (priceState.status === "error") return <ChartFrame>{selector}{head}<p className="chart-state error" role="alert">De energieprijzen voor morgen konden niet veilig worden opgehaald.</p></ChartFrame>;
-    if (!priceData || priceData.quality === "notPublished" || !priceScale) return <ChartFrame>{selector}{head}<p className="chart-state future" aria-live="polite"><strong>De prijzen voor morgen zijn nog niet gepubliceerd.</strong><span>Zolang dit tabblad zichtbaar is, controleren we automatisch elke tien minuten op nieuwe prijzen.</span></p></ChartFrame>;
-    return <ChartFrame>{selector}{head}<p className="price-note">Energie-/spotprijs in ct/kWh · exclusief nettarieven, heffingen en jouw contractkosten</p><p className="chart-warning" role="status">Vermogen wordt pas morgen gemeten.</p>{priceData.quality === "incomplete" && <p className="chart-warning" role="status">Gedeeltelijke prijsreeks: niet alle gepubliceerde uren zijn beschikbaar.</p>}<PriceOnlyChart displayWindow={displayWindow} data={priceData} scale={priceScale} label={`${selectedDay.label}, ${selectedDay.dateLabel}`} /></ChartFrame>;
+    if (priceState.status === "unavailable") return <ChartFrame summary={fullscreenSummary}>{selector}{head}<p className="chart-state">Geen verbinding met de prijsbron.</p></ChartFrame>;
+    if (priceState.status === "loading") return <ChartFrame summary={fullscreenSummary}>{selector}{head}<p className="chart-state" role="status">De gepubliceerde energieprijzen voor morgen worden geladen…</p></ChartFrame>;
+    if (priceState.status === "error") return <ChartFrame summary={fullscreenSummary}>{selector}{head}<p className="chart-state error" role="alert">De energieprijzen voor morgen konden niet veilig worden opgehaald.</p></ChartFrame>;
+    if (!priceData || priceData.quality === "notPublished" || !priceScale) return <ChartFrame summary={fullscreenSummary}>{selector}{head}<p className="chart-state future" aria-live="polite"><strong>De prijzen voor morgen zijn nog niet gepubliceerd.</strong><span>Zolang dit tabblad zichtbaar is, controleren we automatisch elke tien minuten op nieuwe prijzen.</span></p></ChartFrame>;
+    return <ChartFrame summary={fullscreenSummary}>{selector}{head}<p className="price-note">Energie-/spotprijs in ct/kWh · exclusief nettarieven, heffingen en jouw contractkosten</p><p className="chart-warning" role="status">Vermogen wordt pas morgen gemeten.</p>{priceData.quality === "incomplete" && <p className="chart-warning" role="status">Gedeeltelijke prijsreeks: niet alle gepubliceerde uren zijn beschikbaar.</p>}<PriceOnlyChart displayWindow={displayWindow} data={priceData} scale={priceScale} label={`${selectedDay.label}, ${selectedDay.dateLabel}`} /></ChartFrame>;
   }
   const powerMessage = state.status === "unavailable" ? "Verbruiksgeschiedenis is alleen beschikbaar wanneer Home Assistant verbonden is." : state.status === "loading" ? "De gekozen dag wordt geladen…" : state.status === "empty" ? "Vandaag zijn nog geen metingen beschikbaar." : state.status === "error" ? "De verbruiksgeschiedenis voor deze dag kon niet veilig worden opgehaald." : undefined;
-  if (powerMessage) return <ChartFrame>{selector}{head}{priceScale && priceData ? <><p className="price-note">Energie-/spotprijs in ct/kWh · exclusief nettarieven, heffingen en jouw contractkosten</p>{priceData.quality === "incomplete" && <p className="chart-warning" role="status">Gedeeltelijke prijsreeks: niet alle gepubliceerde uren zijn beschikbaar.</p>}<p className="chart-warning" role="status">{powerMessage}</p><PriceOnlyChart displayWindow={displayWindow} data={priceData} scale={priceScale} label={`${selectedDay.label}, ${selectedDay.dateLabel}`} /></> : <p className={`chart-state${state.status === "error" ? " error" : ""}`} role={state.status === "loading" ? "status" : undefined} aria-live="polite">{powerMessage}</p>}</ChartFrame>;
-  if (state.status === "future") return <ChartFrame>{selector}{head}<p className="chart-state future" aria-live="polite"><strong>Morgen is nog niet gemeten.</strong><span>De grafiek verschijnt zodra deze dag begonnen is en echte Home Assistant-metingen beschikbaar zijn.</span></p></ChartFrame>;
-  if (state.status !== "success") return <ChartFrame>{selector}{head}<p className="chart-state" aria-live="polite">De verbruiksgeschiedenis is tijdelijk niet beschikbaar.</p></ChartFrame>;
+  if (powerMessage) return <ChartFrame summary={fullscreenSummary}>{selector}{head}{priceScale && priceData ? <><p className="price-note">Energie-/spotprijs in ct/kWh · exclusief nettarieven, heffingen en jouw contractkosten</p>{priceData.quality === "incomplete" && <p className="chart-warning" role="status">Gedeeltelijke prijsreeks: niet alle gepubliceerde uren zijn beschikbaar.</p>}<p className="chart-warning" role="status">{powerMessage}</p><PriceOnlyChart displayWindow={displayWindow} data={priceData} scale={priceScale} label={`${selectedDay.label}, ${selectedDay.dateLabel}`} /></> : <p className={`chart-state${state.status === "error" ? " error" : ""}`} role={state.status === "loading" ? "status" : undefined} aria-live="polite">{powerMessage}</p>}</ChartFrame>;
+  if (state.status === "future") return <ChartFrame summary={fullscreenSummary}>{selector}{head}<p className="chart-state future" aria-live="polite"><strong>Morgen is nog niet gemeten.</strong><span>De grafiek verschijnt zodra deze dag begonnen is en echte Home Assistant-metingen beschikbaar zijn.</span></p></ChartFrame>;
+  if (state.status !== "success") return <ChartFrame summary={fullscreenSummary}>{selector}{head}<p className="chart-state" aria-live="polite">De verbruiksgeschiedenis is tijdelijk niet beschikbaar.</p></ChartFrame>;
   const { data } = state;
-  if (data.import.length === 0 && data.export.length === 0) return <ChartFrame>{selector}{head}<p className="chart-state" aria-live="polite">Home Assistant heeft voor deze dag geen meetpunten.</p>{priceScale && priceData && <PriceOnlyChart displayWindow={displayWindow} data={priceData} scale={priceScale} label={selectedDay.label + ", " + selectedDay.dateLabel} />}</ChartFrame>;
+  if (data.import.length === 0 && data.export.length === 0) return <ChartFrame summary={fullscreenSummary}>{selector}{head}<p className="chart-state" aria-live="polite">Home Assistant heeft voor deze dag geen meetpunten.</p>{priceScale && priceData && <PriceOnlyChart displayWindow={displayWindow} data={priceData} scale={priceScale} label={selectedDay.label + ", " + selectedDay.dateLabel} />}</ChartFrame>;
   const scaled = scalePowerHistory(data, displayWindow);
   const powerTicks = powerAxisTicks(scaled);
-  return <ChartFrame>{selector}{head}
+  return <ChartFrame summary={fullscreenSummary}>{selector}{head}
     {state.refreshError && <p className="chart-warning" role="status">De laatste verversing lukte niet; de laatst geldige meting blijft zichtbaar.</p>}
     {data.quality === "incomplete" && <p className="chart-warning" role="status">Gedeeltelijke meting: één of beide meetreeksen is niet volledig beschikbaar.</p>}
-    {selection === "today" && <p className="chart-warning" role="status">Metingen tot {brusselsChartTime(data.end, true)}; het resterende deel van vandaag blijft bewust leeg.</p>}
+    {selection === "today" && <p className="chart-warning chart-coverage" role="status">Metingen tot {brusselsChartTime(data.end, true)}; het resterende deel van vandaag blijft bewust leeg.</p>}
     {priceData?.quality === "incomplete" && <p className="chart-warning" role="status">Gedeeltelijke prijsreeks: niet alle gepubliceerde uren zijn beschikbaar.</p>}
     {priceScale && <p className="price-note">Energie-/spotprijs in ct/kWh · exclusief nettarieven, heffingen en jouw contractkosten</p>}
     {priceScale && <PriceExtremes scale={priceScale}/>}

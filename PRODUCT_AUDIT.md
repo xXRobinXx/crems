@@ -1,3 +1,7 @@
+## Kandidaat0.1.20 — 5november2026
+
+Gerichte compacte-grafiekrelease APPROVED na actuele volledige checks en browser-PASS; Pi nog0.1.19. [Review en scopegrenzen](docs/reviews/task-061-release020-review-2026-11-05.md). Verse protected CREMS-backup8b9d14f3; post-update asset/live/resultaatbehoud en tablet nog te controleren.24uur-/geïsoleerde restore-/providergates blijven open; geen algemene operationele vrijgave.
+
 ## Actualisering 19 oktober 2026
 
 [Actuele afrondingscontrole](docs/reviews/task-061-closeout-2026-10-19.md): 383 tests en structuur/build/typecheck PASS; Pi 0.1.18 started via Tailscale, direct LAN onbereikbaar. Nieuwe 24-uursmeting loopt; geen stabiliteits-PASS of algemene releasegoedkeuring. Hostherstart/gegevensbehoud was op 16 oktober bewezen. Restorehost, LAN-route, providerrechten/configuratie en release/browsergates blijven open. Geen productiecode gewijzigd.

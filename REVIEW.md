@@ -1,3 +1,7 @@
+## Task061 — 5november2026 — grafiekrelease0.1.20 APPROVED binnen scope
+
+Root sequentiële Agent A-rol na bronfreeze, geen onafhankelijke subagentclaim. Nieuwe volledige harness:371producttests/16tooltests, structuur/build/typecheck en stable fingerprint PASS. Actuele12scenario-browsermatrix plus echte tablet op identieke UI-assets PASS. [Reviewbesluit](docs/reviews/task-061-release020-review-2026-11-05.md), [browserbewijs](docs/reviews/task-061-release020-browser-2026-11-05.md). Verse protected backup8b9d14f3; uitrol en echte geïnstalleerde tabletcontrole volgen. Geen algemene operationele goedkeuring:24uur/restore/provider blijven open.
+
 ## Actualisering 19 oktober 2026
 
 [Actuele afrondingscontrole](docs/reviews/task-061-closeout-2026-10-19.md): 383 tests en structuur/build/typecheck PASS; Pi 0.1.18 started via Tailscale, direct LAN onbereikbaar. Nieuwe 24-uursmeting loopt; geen stabiliteits-PASS of algemene releasegoedkeuring. Hostherstart/gegevensbehoud was op 16 oktober bewezen. Restorehost, LAN-route, providerrechten/configuratie en release/browsergates blijven open. Geen productiecode gewijzigd.
