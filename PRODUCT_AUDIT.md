@@ -1,3 +1,7 @@
+## Geïnstalleerd0.1.20 — 5november2026 — compacte grafiek/tablet PASS
+
+Gevraagde uitrol afgerond: Pi0.1.20 started, exacte assets en echte livebron, profiel/batterijrapport inhoudelijk behouden. Echte native Lenovo:3actuele kopwaarden en grafiek, passende assen/tijdas, exit/herintreden en slaap→HA-wekken PASS; tablet in echte nieuwe fullscreen achtergelaten. [Deploymentbewijs](docs/reviews/task-061-deployment020-2026-11-05.md). Review APPROVED uitsluitend deze scope; brede24uur-/restore-/providergates blijven open. Eerdere kandidaatteksten hieronder zijn historische stappen.
+
 ## Kandidaat0.1.20 — 5november2026
 
 Gerichte compacte-grafiekrelease APPROVED na actuele volledige checks en browser-PASS; Pi nog0.1.19. [Review en scopegrenzen](docs/reviews/task-061-release020-review-2026-11-05.md). Verse protected CREMS-backup8b9d14f3; post-update asset/live/resultaatbehoud en tablet nog te controleren.24uur-/geïsoleerde restore-/providergates blijven open; geen algemene operationele vrijgave.

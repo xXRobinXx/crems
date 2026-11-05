@@ -25,3 +25,7 @@ Eerder in deze doorlopende sessie expliciet geautoriseerd en uitgevoerd: Lenovo 
 Maximaal3privacyveilige screenshots van deze UI-scope: .harness/compact-graph-mobile.png, .harness/compact-graph-landscape.png, .harness/compact-graph-tablet.png. Alleen synthetische gegevens, geen token/identifier/CSV-inhoud. Testtabblad en tijdelijke routes na fysieke proef opgeruimd; echte HA-app teruggezet.
 
 Echte wek-/hertrigger-/tienminutentimeout afzonderlijk PASS op de geïnstalleerde vorige versie; [bewijs](task-061-consumption-wake-2026-11-05.md). Na update0.1.20 blijven exacte assetversie, echte livebron en fysieke tablet-fullscreencontrole verplicht.
+
+## Afsluitende binding na installatie
+
+Gevraagde echte tabletuitrol0.1.20 nu PASS: [deploymentbewijs](task-061-deployment020-2026-11-05.md). Productiecode/configuratie is byte-inhoudelijk ongewijzigd ten opzichte van immutable v0.1.20; alleen afsluitende taak-/bewijsdocumentatie toegevoegd. Volledige closeout-harness opnieuw371product/16tool, structuur/build/typecheck PASS, stable=true, fingerprintf66bc2a6f1c1e44053508db6c0305e1cc1aa208bbe23f413df3f665d5d07edcf. Dit bindt de actuele taakstatus; de gepubliceerde bronfingerprint en eerdere browsertijdstippen hierboven blijven expliciet historisch versiegebonden. Echte post-update native tabletcontrole en slaap→wekken PASS zonder extra productieaanpassing. Definitieve status blijft de hierboven begrensde goedkeuring;24uur/restore/provider niet afgevinkt.
